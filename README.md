@@ -3,6 +3,8 @@
 Local browser video editor. The application code lives in `scripts/`, the browser
 UI in `scripts/clipper_ui/`, development checks in `tests/`, and installation and
 distribution helpers in `tools/`. No Node build step is required to run the app.
+[docs/how-it-works.md](docs/how-it-works.md) is the map: the pieces, where
+things live, and how a video becomes a published Short.
 
 ## Install and start (macOS)
 
