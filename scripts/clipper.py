@@ -36,6 +36,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 import ffmpeg_env
+import logbook
 import reframe
 import fast_speech
 import mlx_speech
@@ -77,6 +78,7 @@ WORKSPACE = Path(os.environ.get("CLIPBENCH_WORKSPACE") or ROOT / "workspace")
 PROXY_DIR = WORKSPACE / "clips" / ".proxy"
 PROJECT_DIR = WORKSPACE / "projects"
 AVATAR_FILE = WORKSPACE / "channel" / "avatar.png"
+LOG_FILE = WORKSPACE / "logs" / "clipbench.log"
 DATA_DIR = Path(os.environ.get("CLIPBENCH_DATA") or WORKSPACE / "data")
 DB_FILE = DATA_DIR / "clipbench.db"
 CLIP_THUMB_DIR = DATA_DIR / "clip-thumbs"
@@ -3245,6 +3247,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     ffmpeg_env.activate()
+    sys.stderr = logbook.start(LOG_FILE, sys.stderr)
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true")
@@ -3273,6 +3276,8 @@ def main():
                  f"Stop it, or use --port to pick another.")
     url = f"http://127.0.0.1:{a.port}/"
     print(f"Clip bench on {url}  (Ctrl+C to stop)")
+    print(f"Log file: {LOG_FILE}")
+    print(f"started on {url}", file=sys.stderr)
     if not a.no_open:
         webbrowser.open(url)
     try:

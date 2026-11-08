@@ -37,6 +37,7 @@ workspace/
   projects/      exported cut lists, one per project
   shorts/        rendered Shorts, NNN_name/video.mp4 with title and thumbnail
   channel/       avatar.png, drawn on the title card
+  logs/          clipbench.log, everything the server printed, with timestamps
   data/          clipbench.db and everything keyed to it:
                  transcripts/, speech/, voice/, preview/, rendered/, clip-thumbs/, live/
                  youtube_client.json (your OAuth client), streamers.json

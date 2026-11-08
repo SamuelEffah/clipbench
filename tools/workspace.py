@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Everything the bench downloads, makes or remembers lives under workspace/, so the code sits beside it untouched.
 FOLDERS = (
     "workspace/clips/.proxy", "workspace/clips/.cuts", "workspace/temp", "workspace/broll", "workspace/audio",
-    "workspace/music", "workspace/projects", "workspace/shorts", "workspace/data", "workspace/channel",
+    "workspace/music", "workspace/projects", "workspace/shorts", "workspace/data", "workspace/channel", "workspace/logs",
     "scripts/models",
 )
 
