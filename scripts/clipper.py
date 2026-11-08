@@ -2829,6 +2829,7 @@ class Handler(BaseHTTPRequestHandler):
                   "/livecap.js": ("livecap.js", "text/javascript"),
                   "/voice.js": ("voice.js", "text/javascript"),
                   "/lanedrag.js": ("lanedrag.js", "text/javascript"),
+                  "/hoverhead.js": ("hoverhead.js", "text/javascript"),
                   "/vocals.js": ("vocals.js", "text/javascript"),
                   "/clippreview.js": ("clippreview.js", "text/javascript"),
                   "/live.js": ("live.js", "text/javascript"),
