@@ -612,6 +612,51 @@ function syncSounds() {
   }
 }
 
+// ----- Voice only in the preview -----
+
+// A voice-only clip is heard from its isolated wav, in step with its picture, while the picture's own sound is muted.
+// Called every frame, so it owns the mute of whichever players are on screen: a clip with no voice, or whose voice is
+// still being isolated, is heard as it is. A player that is no longer on screen pauses.
+const voicePlayers = new Map();
+function syncVoices() {
+  const active = [];
+  if (preview.on && !preview.done) {
+    const top = state.project.clips[preview.idx];
+    if (top) active.push([video, top]);
+    laneVids.forEach((el, n) => { if (lowNow[n] && lowNow[n].clip) active.push([el, lowNow[n].clip]); });
+  }
+  const used = new Set();
+  for (const [el, clip] of active) {
+    const url = typeof voiceUrl === "function" ? voiceUrl(clip) : null;
+    if (!url) {
+      setPlaybackValue(el, "muted", previewMuted || playVolume(clip) === 0);
+      continue;
+    }
+    const key = voiceKey(clip);
+    used.add(key);
+    let player = voicePlayers.get(key);
+    if (!player) {
+      player = new Audio(url);
+      player.preload = "auto";
+      voicePlayers.set(key, player);
+    }
+    setPlaybackValue(el, "muted", true);
+    // The wav starts at the clip's in point, so its time is the source time past that point.
+    const want = Math.max(0, tnow(el) - clip.in);
+    setPlaybackValue(player, "playbackRate", el.playbackRate);
+    setPlaybackValue(player, "volume", Math.min(1, volumeOf(clip)));
+    setPlaybackValue(player, "muted", previewMuted || playVolume(clip) === 0);
+    if (el.paused) {
+      if (!player.paused) player.pause();
+      if (Math.abs(player.currentTime - want) > 0.05) player.currentTime = want;
+      continue;
+    }
+    if (Math.abs(player.currentTime - want) > 0.3) player.currentTime = want;
+    if (player.paused) player.play().catch(() => {});
+  }
+  voicePlayers.forEach((player, key) => { if (!used.has(key) && !player.paused) player.pause(); });
+}
+
 // ----- Dropping a sound onto the timeline -----
 
 // Anywhere on the timeline takes the drop: the sound lands at that point in time, and a ghost shows where.

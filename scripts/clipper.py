@@ -1023,11 +1023,19 @@ def rounded_range(start, end):
     return float(fmt_time(start)), float(fmt_time(end))
 
 
+def voice_file_url(target):
+    """Where the page plays a saved voice from."""
+    return f"/voice/{target.name}"
+
+
 def start_voice(src, start, end):
     start, end = rounded_range(start, end)
     target = voice_isolation.cached_path(VOICE_DIR, src, start, end)
-    job = {"id": hashlib.sha1(f"{target}{time.time()}".encode()).hexdigest()[:12], "state": "done" if target.is_file() else "working",
-           "message": "Taking the music out"}
+    job_id = hashlib.sha1(f"{target}{time.time()}".encode()).hexdigest()[:12]
+    if target.is_file():
+        job = {"id": job_id, "state": "done", "file": voice_file_url(target)}
+    else:
+        job = {"id": job_id, "state": "working", "message": "Taking the music out"}
     voice_jobs[job["id"]] = job
     if job["state"] == "working":
         threading.Thread(target=run_voice, args=(job["id"], src, start, end), daemon=True).start()
@@ -1036,8 +1044,8 @@ def start_voice(src, start, end):
 
 def run_voice(job_id, src, start, end):
     try:
-        voice_isolation.isolate(VOICE_DIR, src, start, end)
-        voice_jobs[job_id] = {"id": job_id, "state": "done"}
+        target = voice_isolation.isolate(VOICE_DIR, src, start, end)
+        voice_jobs[job_id] = {"id": job_id, "state": "done", "file": voice_file_url(target)}
     except ValueError as err:
         voice_jobs[job_id] = {"id": job_id, "state": "error", "message": str(err)[:300]}
     except Exception as err:
@@ -2601,6 +2609,8 @@ def export_cuts(name, project, directory=None):
                 raise ValueError(f"clip {i} is a saved file, so its voice can't be isolated")
             voice = voice_isolation.cached_path(VOICE_DIR, src, *rounded_range(start, end))
             if not voice.is_file():
+                if voice_isolation.working(VOICE_DIR, src, *rounded_range(start, end)):
+                    raise ValueError(f"Clip {i}'s voice is still being isolated. Try again in a moment")
                 raise ValueError(f"Clip {i} needs its voice isolated again, its range changed")
             lines.append(f"@voice {voice}")
         if not Path(src).is_file():
@@ -2966,6 +2976,11 @@ class Handler(BaseHTTPRequestHandler):
             if not cut_path(m.group(1)).is_file():
                 return self.send_error(404)
             return self.serve_file(cut_path(m.group(1)), "video/mp4")
+        if m := re.fullmatch(r"/voice/([0-9a-f]{16})\.wav", path):
+            voice = VOICE_DIR / f"{m.group(1)}.wav"
+            if not voice.is_file():
+                return self.send_error(404)
+            return self.serve_file(voice, "audio/wav")
         if m := re.fullmatch(r"/media/([0-9a-f]{12})", path):
             src = registry.get(m.group(1))
             if not src:

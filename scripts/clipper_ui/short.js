@@ -436,7 +436,7 @@ function soundBlock(c, gi, at, pps, v) {
   canvas.className = "stl-wave";
   box.classList.toggle("busy", busy);
   if (c.voice) box.classList.add("voice");
-  if (busy) box.append(Object.assign(document.createElement("span"), {className: "snd-busy", textContent: "Processing…"}));
+  if (busy) box.append(Object.assign(document.createElement("span"), {className: "snd-busy", textContent: `Isolating voice, ${voiceEstimate(c)}`}));
   const svg = document.createElementNS(SND_NS, "svg");
   svg.setAttribute("class", "snd-env");
   const unity = document.createElement("i");

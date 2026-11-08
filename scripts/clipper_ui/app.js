@@ -1411,6 +1411,7 @@ function render() {
   renderFx();
   renderFavs();
   renderShortMode();
+  if (typeof ensureVoices === "function") ensureVoices();
 }
 
 function select(i) {
@@ -2185,6 +2186,7 @@ function tick() {
     syncSounds();
     paintPlayhead();
   } else stopSounds();
+  syncVoices();
   applyMonitorFx();
   drawMirror();
   requestAnimationFrame(tick);

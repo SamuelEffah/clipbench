@@ -30,7 +30,7 @@ assert.equal(frames.length,2,'one initial render and one completed render, witho
 assert.deepEqual(frames,[{busy:1,clips:[false]},{busy:0,clips:[true]}]);assert.equal(requests,1);assert.equal(editCount,1);assert.deepEqual(history,['']);assert.equal(unsaved,true);assert.equal(voiceWorking.size,0);
 reset([makeClip('one'),makeClip('two')]);await isolateVoice([0,1]);assert.equal(frames.length,3);assert.equal(history.length,2);assert.ok(state.project.clips.every(c=>c.voice));assert.equal(frames.at(-1).busy,0);
 // Failures still clear Processing and redraw, without recording an edit.
-reset([makeClip('bad')]);respond=async()=>{throw Error('failed');};await isolateVoice([0]);assert.equal(frames.length,2);assert.equal(history.length,0);assert.equal(voiceWorking.size,0);assert.deepEqual(messages,['failed']);assert.equal(state.project.clips[0].voice,undefined);
+reset([makeClip('bad')]);respond=async()=>{throw Error('failed');};await isolateVoice([0]);assert.equal(frames.length,2);assert.equal(history.length,0);assert.equal(voiceWorking.size,0);assert.deepEqual(messages,['Isolating the voice, about 5s','failed']);assert.equal(state.project.clips[0].voice,undefined);
 // A result arriving after switching projects must not edit the new project.
 reset([makeClip('old')]);let resolve;respond=()=>new Promise(r=>resolve=r);const pending=isolateVoice([0]);
 state.project={name:'other',clips:[makeClip('new')]};resolve({state:'done'});await pending;assert.equal(history.length,0);assert.equal(state.project.clips[0].voice,undefined);assert.equal(frames.at(-1).busy,0);

@@ -26,6 +26,13 @@ def cached_path(folder, src, start, end, track=0):
     return Path(folder) / f"{key}.wav"
 
 
+def working(folder, src, start, end, track=0):
+    """Whether this stretch is being separated right now."""
+    key = str(cached_path(folder, src, start, end, track).absolute())
+    with _pending_lock:
+        return key in _pending
+
+
 def isolate(folder, src, start, end, track=0):
     """The wav holding only the voice of src from start to end, separating it if it is not saved yet. Raises ValueError with a
     message for the page when it can't. Concurrent requests share the same separation."""
