@@ -1,18 +1,19 @@
-"""Create local runtime folders without touching existing media or projects."""
+"""Create the local workspace folders without touching existing media or projects."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Everything the bench downloads, makes or remembers lives under workspace/, so the code sits beside it untouched.
 FOLDERS = (
-    "clips/.proxy", "clips/.cuts", "temp", "broll", "audio", "music",
-    "projects", "shorts", "data", "cuts", "narration", "voices", "thumbs", "out",
-    "assets/channel", "scripts/models",
+    "workspace/clips/.proxy", "workspace/clips/.cuts", "workspace/temp", "workspace/broll", "workspace/audio",
+    "workspace/music", "workspace/projects", "workspace/shorts", "workspace/data", "workspace/channel",
+    "scripts/models",
 )
 
 
 def initialize(root=ROOT):
     for folder in FOLDERS:
         (root / folder).mkdir(parents=True, exist_ok=True)
-    avatar = root / "assets/channel/avatar.png"
+    avatar = root / "workspace/channel/avatar.png"
     if not avatar.exists():
         from PIL import Image, ImageDraw
         image = Image.new("RGB", (256, 256), (25, 25, 28))

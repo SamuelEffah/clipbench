@@ -42,7 +42,7 @@ download when first used. MLX speech is installed only on Apple Silicon. Review
 the model and dependency licenses for your intended use.
 AI suggestions also require a separately configured local Ollama installation;
 `OLLAMA_HOST` and `CLIPBENCH_LLM` can select its server and model. YouTube publishing
-requires your own Desktop OAuth client JSON at `data/youtube_client.json` and
+requires your own Desktop OAuth client JSON at `workspace/data/youtube_client.json` and
 account authorization in the app. These services and credentials are not bundled.
 
 ## Local data and source control
@@ -52,15 +52,15 @@ Git. Media, channel images, cut lists, narration, projects, rendered Shorts,
 databases, credentials, downloaded models, environments, and caches are ignored.
 Folders are created by setup rather than committed as empty placeholder files.
 
-Put source videos in `clips/`, extra footage in `broll/`, and audio in `audio/`
-or `music/`. Projects and account state live in `data/` (override with
-`CLIPBENCH_DATA`); project exports may also live in `projects/`. Rendered videos
-live in `shorts/`. Back up local data and media separately: Git does not back them
-up. Replace `assets/channel/avatar.png` with your own image when needed.
-
-Previously tracked personal files were removed from the current Git index while
-preserving local copies. They remain in old Git history. Do not share this
-repository's `.git` folder as a clean starter; use the exporter below.
+Everything the app downloads, makes or remembers lives under `workspace/`
+(move it with `CLIPBENCH_WORKSPACE`). Put source videos in `workspace/clips/`,
+extra footage in `workspace/broll/`, and audio in `workspace/audio/` or
+`workspace/music/`. Projects and account state live in `workspace/data/`
+(override with `CLIPBENCH_DATA`); cut-list exports land in `workspace/projects/`
+and rendered videos in `workspace/shorts/`. Back up the workspace separately:
+Git does not back it up. Replace `workspace/channel/avatar.png` with your own
+image when needed. An install laid out the old way, with those folders beside
+the code, is moved into the workspace by `./setup.sh` or `python3 tools/relocate.py`.
 
 ## Give someone a starter pack
 

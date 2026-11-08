@@ -22,6 +22,7 @@ requirements=requirements.txt
 if [[ "${1:-}" == --ai ]]; then requirements=requirements-ai.txt; fi
 .venv/bin/python -m pip install -r "$requirements"
 export PATH="$PWD/.venv/bin:$PATH"
+.venv/bin/python tools/relocate.py
 .venv/bin/python tools/workspace.py
 if [[ "${1:-}" == --ai ]]; then .venv/bin/python tools/setup_models.py; fi
 .venv/bin/python tools/check_setup.py

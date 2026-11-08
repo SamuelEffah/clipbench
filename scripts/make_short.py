@@ -1392,7 +1392,7 @@ def main():
     p.add_argument("--watermark", help="faint text centred over the clip (card mode), e.g. your channel handle")
     p.add_argument("--name", default="", help="channel name on the title card; the bench passes the connected YouTube channel's")
     p.add_argument("--handle", default="", help="channel handle on the title card, e.g. @channel; blank draws none")
-    p.add_argument("--avatar", default="assets/channel/avatar.png")
+    p.add_argument("--avatar", default="workspace/channel/avatar.png")
     p.add_argument("--draft", action="store_true", help="encode with the hardware encoder: faster, larger, for previews")
     p.add_argument("--audio-mix", help="JSON list of songs and sound effects laid over the finished Short")
     p.add_argument("--music")

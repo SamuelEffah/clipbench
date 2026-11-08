@@ -11,21 +11,8 @@ coverage.xml
 htmlcov/
 dist/
 
-# Local media, projects, generated outputs, and user configuration
-/clips/
-/temp/
-/out/
-/projects/
-/music/
-/audio/
-/broll/
-/shorts/
-/data/
-/cuts/
-/narration/
-/voices/
-/thumbs/
-/assets/channel/
+# Local media, projects, generated outputs, and user configuration all live in the workspace
+/workspace/
 *.mp4
 *.mkv
 *.mov

@@ -8,8 +8,12 @@ import threading
 from pathlib import Path
 
 
+# What a transcript is filed under: the server sets this to the video's place in its workspace.
+key_of = str
+
+
 def path_for(data_dir, src):
-    return Path(data_dir) / "transcripts" / f"{hashlib.sha1(str(src).encode()).hexdigest()[:12]}.json"
+    return Path(data_dir) / "transcripts" / f"{hashlib.sha1(key_of(src).encode()).hexdigest()[:12]}.json"
 
 
 def _stamp(src):

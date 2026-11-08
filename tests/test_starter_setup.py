@@ -13,9 +13,9 @@ class StarterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             initialize(root)
-            avatar = root / "assets/channel/avatar.png"
+            avatar = root / "workspace/channel/avatar.png"
             avatar.write_bytes(b"personal avatar")
-            project = root / "projects/personal.json"
+            project = root / "workspace/projects/personal.json"
             project.write_text("private")
             initialize(root)
             self.assertTrue(all((root / folder).is_dir() for folder in FOLDERS))

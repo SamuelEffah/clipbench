@@ -71,9 +71,12 @@ ROOT = Path(__file__).resolve().parent.parent
 from color_grade import GRADE_DEFAULTS, GRADE_RANGES
 
 UI_DIR = Path(__file__).resolve().parent / "clipper_ui"
-PROXY_DIR = ROOT / "clips" / ".proxy"
-PROJECT_DIR = ROOT / "projects"
-DATA_DIR = Path(os.environ.get("CLIPBENCH_DATA") or ROOT / "data")
+# Everything the bench downloads, makes or remembers lives under one folder, so the code sits beside it untouched.
+WORKSPACE = Path(os.environ.get("CLIPBENCH_WORKSPACE") or ROOT / "workspace")
+PROXY_DIR = WORKSPACE / "clips" / ".proxy"
+PROJECT_DIR = WORKSPACE / "projects"
+AVATAR_FILE = WORKSPACE / "channel" / "avatar.png"
+DATA_DIR = Path(os.environ.get("CLIPBENCH_DATA") or WORKSPACE / "data")
 DB_FILE = DATA_DIR / "clipbench.db"
 CLIP_THUMB_DIR = DATA_DIR / "clip-thumbs"
 CLIENT_FILE = DATA_DIR / "youtube_client.json"
@@ -81,12 +84,12 @@ STREAMER_FILE = DATA_DIR / "streamers.json"
 recorder = liverec.Recorder(DATA_DIR / "live")
 cams = cam_memory.CamMemory(DATA_DIR / "cams.json")
 FAVORITES_LIMIT = 300
-BROLL_DIR = ROOT / "broll"
-LIBRARY_DIRS = [ROOT / "clips", ROOT / "temp", BROLL_DIR]
+BROLL_DIR = WORKSPACE / "broll"
+LIBRARY_DIRS = [WORKSPACE / "clips", WORKSPACE / "temp", BROLL_DIR]
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi"}
 DIRECT_EXTS = {".mp4", ".m4v", ".mov"}
-AUDIO_DIR = ROOT / "audio"
-AUDIO_DIRS = [AUDIO_DIR, ROOT / "music"]
+AUDIO_DIR = WORKSPACE / "audio"
+AUDIO_DIRS = [AUDIO_DIR, WORKSPACE / "music"]
 AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".aiff", ".aif"}
 AUDIO_TYPES = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", ".aac": "audio/aac", ".ogg": "audio/ogg",
                ".flac": "audio/flac", ".aiff": "audio/aiff", ".aif": "audio/aiff"}
@@ -126,8 +129,21 @@ registry = {}
 proxies = {}
 
 
+def media_key(path):
+    """What a video is known by: its place inside the workspace, so the workspace can move or the bench be cloned
+    anywhere without its proxies, transcripts and suggestions becoming strangers; a file elsewhere keeps its full path."""
+    p = Path(path)
+    try:
+        return p.relative_to(WORKSPACE).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def video_id(path):
-    return hashlib.sha1(str(path).encode()).hexdigest()[:12]
+    return hashlib.sha1(media_key(path).encode()).hexdigest()[:12]
+
+
+transcript_index.key_of = media_key
 
 
 _probes = {}
@@ -917,7 +933,7 @@ def prepare_after_download(path):
 
 
 RENDER_TIME_RE = re.compile(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)")
-SHORT_DIR = ROOT / "shorts"
+SHORT_DIR = WORKSPACE / "shorts"
 renders = {}
 
 
@@ -1468,7 +1484,7 @@ def preview_signature(sub):
             paths.append(cut_path(saved))
     if clip.get("voice") and src.is_file():
         paths.append(voice_isolation.cached_path(VOICE_DIR, source, *rounded_range(clip["in"], clip["out"])))
-    paths += [ROOT / "assets/channel/avatar.png", ROOT / "scripts/make_short.py",
+    paths += [AVATAR_FILE, ROOT / "scripts/make_short.py",
               ROOT / "scripts/tracking.py", Path(FONT_IMPACT), Path(FONT_BOLD), Path(FONT_REGULAR), Path(FONT_EMOJI)]
     # Timeline annotations and edit protection do not enter the rendered picture
     # or soundtrack. Keep them from invalidating an otherwise reusable preview.
@@ -1565,7 +1581,7 @@ def run_render(name, hook, folder, flags, cuts=None, out=None):
     renders[name] = {"state": "error", "message": (lines[-1] if lines else "The render failed")[:300]}
 
 
-DOWNLOAD_DIR = ROOT / "clips"
+DOWNLOAD_DIR = WORKSPACE / "clips"
 MAX_DOWNLOAD = "2G"
 downloads = {}
 PROGRESS_RE = re.compile(r"\[download\]\s+(\d+(?:\.\d+)?)%")
@@ -2043,7 +2059,7 @@ def remove_video(vid):
     return how
 
 
-CUT_DIR = ROOT / "clips" / ".cuts"
+CUT_DIR = WORKSPACE / "clips" / ".cuts"
 MAX_CUT_SECONDS = 900
 CUT_PRUNE_DAYS = 90
 cuts = {}
@@ -2713,9 +2729,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self.host_ok():
             return self.send_error(403)
         path = unquote(urlparse(self.path).path)
-        avatar = ROOT / "assets" / "channel" / "avatar.png"
-        if path == "/avatar.png" and avatar.is_file():
-            return self.serve_file(avatar, "image/png")
+        if path == "/avatar.png" and AVATAR_FILE.is_file():
+            return self.serve_file(AVATAR_FILE, "image/png")
         static = {"/": ("home.html", "text/html; charset=utf-8"),
                   "/editor": ("index.html", "text/html; charset=utf-8"),
                   "/home.css": ("home.css", "text/css"),
@@ -3175,7 +3190,7 @@ class Handler(BaseHTTPRequestHandler):
                 text, command = export_cuts(m.group(1), body)
             except (ValueError, KeyError, TypeError) as err:
                 return self.send_json({"error": str(err)}, 400)
-            return self.send_json({"cuts": text, "command": command, "file": f"projects/{m.group(1)}.cuts.txt"})
+            return self.send_json({"cuts": text, "command": command, "file": f"workspace/projects/{m.group(1)}.cuts.txt"})
         self.send_error(404)
 
     def do_PUT(self):
