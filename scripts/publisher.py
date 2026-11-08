@@ -1,9 +1,8 @@
 """Connect a YouTube account and upload rendered Shorts in the background, recording each try in the store."""
+import logging
 import secrets
-import sys
 import threading
 import time
-import traceback
 from pathlib import Path
 
 import youtube as yt
@@ -50,7 +49,7 @@ class Publisher:
         try:
             found = yt.channel_identity(token, self.run)
         except yt.YouTubeError as err:
-            print(f"youtube channel lookup failed: {err}", file=sys.stderr)
+            logging.getLogger("clipbench.youtube").warning("channel lookup failed: %s", err)
             return {}
         if found:
             self.store.set_setting(yt.CHANNEL_KEY, found)
@@ -104,15 +103,19 @@ class Publisher:
         def progress(pct):
             with self.lock:
                 self.live[short] = {"state": "uploading", "pct": int(pct)}
+        upload_log = logging.getLogger("clipbench.youtube")
+        upload_log.info("%s: uploading %s", short, video_path)
         try:
             uploaded = yt.upload_video(token, video_path, title, description, self.run, progress)
             self.store.finish_upload(upload_id, uploaded.video_id, uploaded.privacy)
+            upload_log.info("%s: uploaded as %s (%s)", short, uploaded.video_id, uploaded.privacy)
         except yt.YouTubeError as err:
             if isinstance(err, yt.YouTubeAuthError):
                 self.store.delete_setting(yt.TOKEN_KEY)
+            upload_log.warning("%s: upload failed: %s", short, err)
             self.store.fail_upload(upload_id, err)
         except Exception as err:
-            traceback.print_exc(file=sys.stderr)
+            upload_log.exception("%s: upload crashed", short)
             self.store.fail_upload(upload_id, f"Unexpected error: {err}")
         finally:
             with self.lock:

@@ -65,3 +65,87 @@ class LogbookTests(unittest.TestCase):
             tee.write("still here\n")
             self.assertIn("still here", terminal.getvalue())
             self.assertIn("clipbench.log", terminal.getvalue())
+
+
+import logging  # noqa: E402
+import time  # noqa: E402
+from unittest import mock  # noqa: E402
+
+import clipper  # noqa: E402
+
+
+class StructuredLoggingTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name) / "clipbench.log"
+        self.terminal = io.StringIO()
+        self.addCleanup(logbook.stop)
+
+    def test_logger_lines_carry_level_and_name_in_the_file_and_only_the_message_on_the_terminal(self):
+        logbook.start(self.path, self.terminal)
+        logging.getLogger("clipbench.render").info("render %s done in %.1fs", "ep1", 3.2)
+        self.assertRegex(self.path.read_text(), r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} INFO clipbench\.render: render ep1 done in 3\.2s")
+        self.assertEqual(self.terminal.getvalue(), "render ep1 done in 3.2s\n")
+
+    def test_a_traceback_goes_to_the_file_and_one_line_to_the_terminal(self):
+        logbook.start(self.path, self.terminal)
+        try:
+            raise RuntimeError("boom")
+        except RuntimeError:
+            logging.getLogger("clipbench").exception("listen %s failed", "ep1")
+        text = self.path.read_text()
+        self.assertIn("ERROR clipbench: listen ep1 failed", text)
+        self.assertIn("Traceback (most recent call last)", text)
+        self.assertIn("RuntimeError: boom", text)
+        terminal = self.terminal.getvalue()
+        self.assertEqual(len(terminal.strip().splitlines()), 1)
+        self.assertIn("listen ep1 failed: RuntimeError: boom", terminal)
+        self.assertIn("traceback in", terminal)
+
+    def test_debug_lines_are_kept_only_when_asked(self):
+        logbook.start(self.path, self.terminal)
+        logging.getLogger("clipbench.http").debug("GET /api/library 200 3ms")
+        self.assertNotIn("/api/library", self.path.read_text())
+        logbook.stop()
+        logbook.start(self.path, self.terminal, level="debug")
+        logging.getLogger("clipbench.http").debug("GET /api/library 200 3ms")
+        self.assertIn("/api/library", self.path.read_text())
+        self.assertNotIn("/api/library", self.terminal.getvalue(), "debug noise stays off the terminal")
+
+    def test_starting_twice_does_not_double_the_lines(self):
+        logbook.start(self.path, self.terminal)
+        logbook.start(self.path, self.terminal)
+        logging.getLogger("clipbench").info("once")
+        self.assertEqual(self.path.read_text().count("once"), 1)
+        self.assertEqual(self.terminal.getvalue().count("once"), 1)
+
+
+class RequestLevelTests(unittest.TestCase):
+    def test_static_files_are_not_logged_unless_they_fail(self):
+        self.assertIsNone(logbook.request_level("GET", "/app.js", 200))
+        self.assertIsNone(logbook.request_level("GET", "/media/ep1.mp4", 206))
+        self.assertEqual(logbook.request_level("GET", "/missing.css", 404), logging.WARNING)
+
+    def test_api_reads_are_debug_and_api_writes_are_info(self):
+        self.assertEqual(logbook.request_level("GET", "/api/library", 200), logging.DEBUG)
+        self.assertEqual(logbook.request_level("POST", "/api/cut", 200), logging.INFO)
+
+    def test_failures_are_warnings_and_server_errors_are_errors(self):
+        self.assertEqual(logbook.request_level("POST", "/api/reframe", 400), logging.WARNING)
+        self.assertEqual(logbook.request_level("GET", "/api/library", 500), logging.ERROR)
+
+
+class HandlerRequestLogTests(unittest.TestCase):
+    def test_each_api_request_is_logged_with_its_status_and_duration(self):
+        handler = mock.Mock(command="POST", path="/api/cut", started=time.monotonic() - 0.05)
+        with self.assertLogs("clipbench.http", "INFO") as logs:
+            clipper.Handler.log_request(handler, 200)
+        self.assertEqual(len(logs.output), 1)
+        self.assertRegex(logs.output[0], r"INFO:clipbench\.http:POST /api/cut 200 \d+ms")
+
+    def test_a_request_without_a_start_time_is_still_logged(self):
+        handler = mock.Mock(command="GET", path="/api/library", spec=["command", "path"])
+        with self.assertLogs("clipbench.http", "DEBUG") as logs:
+            clipper.Handler.log_request(handler, 500)
+        self.assertIn("GET /api/library 500", logs.output[0])

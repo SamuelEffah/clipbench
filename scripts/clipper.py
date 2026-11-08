@@ -37,6 +37,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 import ffmpeg_env
 import logbook
+import logging
 import reframe
 import fast_speech
 import mlx_speech
@@ -79,6 +80,8 @@ PROXY_DIR = WORKSPACE / "clips" / ".proxy"
 PROJECT_DIR = WORKSPACE / "projects"
 AVATAR_FILE = WORKSPACE / "channel" / "avatar.png"
 LOG_FILE = WORKSPACE / "logs" / "clipbench.log"
+log = logging.getLogger("clipbench")
+http_log = logging.getLogger("clipbench.http")
 DATA_DIR = Path(os.environ.get("CLIPBENCH_DATA") or WORKSPACE / "data")
 DB_FILE = DATA_DIR / "clipbench.db"
 CLIP_THUMB_DIR = DATA_DIR / "clip-thumbs"
@@ -464,7 +467,7 @@ def run_scenes(vid):
                 if motion and motion["values"]:
                     motion_path(vid).write_text(json.dumps(motion))
     except Exception as err:
-        print(f"scene scan {vid} failed: {err!r}", file=sys.stderr)
+        log.exception("scene scan {vid}")
         times = None
     with scene_finished:
         if times is None:
@@ -609,7 +612,7 @@ def layout_analysis(src, start, end):
         try:
             cams.remember(src, width, height, found["webcam"])
         except OSError as err:
-            print(f"cam memory for {src} failed: {err!r}", file=sys.stderr)
+            log.exception("cam memory for {src}")
     return {**found, "width": width, "height": height}
 
 
@@ -651,7 +654,7 @@ def load_motion(vid, src):
         cache.write_text(json.dumps(found))
         return found
     except (OSError, ValueError, AttributeError) as err:
-        print(f"motion {vid} failed: {err!r}", file=sys.stderr)
+        log.exception("motion {vid}")
         return None
 
 
@@ -690,7 +693,7 @@ def run_suggest(vid):
         suggest_path(vid).write_text(json.dumps(result))
         suggest_jobs[vid] = result
     except (OSError, ValueError, TypeError, KeyError) as err:
-        print(f"suggest {vid} failed: {err!r}", file=sys.stderr)
+        log.exception("suggest {vid}")
         suggest_jobs[vid] = {"state": "error", "message": "Couldn't look for clips in this video"}
 
 
@@ -726,7 +729,7 @@ def run_index(vid):
         transcript_index.build(DATA_DIR, src, listen_whole)
         state = {"state": "ready"}
     except Exception as err:
-        print(f"listen {vid} failed: {err!r}", file=sys.stderr)
+        log.exception("listen {vid}")
         state = {"state": "error", "message": f"Couldn't listen to this video: {err}"[:300]}
     with lock:
         index_jobs[vid] = state
@@ -833,7 +836,7 @@ def build_lessons():
         examples += learning.published_examples(learning.published(shorts, store.channel_videos()), store.video_stats(), rendered_project, saved_suggestions)
         return learning.lessons(examples)
     except Exception as err:
-        print(f"lessons could not be worked out: {err!r}", file=sys.stderr)
+        log.exception("lessons could not be worked out")
         return {}
 
 
@@ -895,12 +898,25 @@ def wait_while(working):
         time.sleep(PREPARE_POLL)
 
 
+class LoggedServer(ThreadingHTTPServer):
+    def handle_error(self, request, client_address):
+        http_log.exception("request from %s:%s crashed", *client_address[:2])
+
+
+def _logged_step(vid, step):
+    def logged(label):
+        logging.getLogger("clipbench.prepare").info("%s: %s", vid, label)
+        step(label)
+    return logged
+
+
 def prepare_video(vid, step):
     """Scan and listen to a video, then rank its clips, so suggestions are waiting when it is opened.
     Scanning decodes video and listening runs on the GPU, so they overlap; ranking needs both."""
     src = registry.get(vid)
     if not src or not Path(src).is_file():
         raise ValueError("unknown video")
+    step = _logged_step(vid, step)
     step("Scanning")
     get_scenes(vid)
     listening = None
@@ -932,7 +948,7 @@ def prepare_after_download(path):
             registry[vid] = p
         prepare_queue.add(vid)
     except Exception as err:
-        print(f"prepare after download failed: {err!r}", file=sys.stderr)
+        log.exception("prepare after download")
 
 
 RENDER_TIME_RE = re.compile(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)")
@@ -998,7 +1014,7 @@ def run_instrumental(job_id, src):
     except ValueError as err:
         instrumental_jobs[job_id] = {"id": job_id, "state": "error", "message": str(err)[:300]}
     except Exception as err:
-        print(f"instrumental {job_id} failed: {err!r}", file=sys.stderr)
+        log.exception("instrumental {job_id}")
         instrumental_jobs[job_id] = {"id": job_id, "state": "error", "message": f"Couldn't take the singing out: {err}"[:300]}
 
 
@@ -1025,7 +1041,7 @@ def run_voice(job_id, src, start, end):
     except ValueError as err:
         voice_jobs[job_id] = {"id": job_id, "state": "error", "message": str(err)[:300]}
     except Exception as err:
-        print(f"voice {job_id} failed: {err!r}", file=sys.stderr)
+        log.exception("voice {job_id}")
         voice_jobs[job_id] = {"id": job_id, "state": "error", "message": f"Couldn't isolate the voice: {err}"[:300]}
 
 
@@ -1254,7 +1270,7 @@ def run_transcribe(job_id, exe, src, start, end, timed=False, task="translate"):
     try:
         listen(job_id, exe, src, start, end, timed, task)
     except Exception as err:
-        print(f"transcribe {job_id} failed: {err!r}", file=sys.stderr)
+        log.exception("transcribe {job_id}")
         transcripts[job_id] = {"id": job_id, "state": "error", "message": f"Listening failed: {err}"[:300]}
 
 
@@ -1428,7 +1444,7 @@ def describe_render(name, project):
         saved = json.loads(path.read_text())
         path.write_text(json.dumps({**saved, "moments": moments}))
     except Exception as err:
-        print(f"moments of {name} could not be measured: {err!r}", file=sys.stderr)
+        log.exception("moments of %s could not be measured", name)
 
 
 def start_render(name, project):
@@ -1570,6 +1586,9 @@ def run_render(name, hook, folder, flags, cuts=None, out=None):
            "--card", *flags, f"--text={hook}", "--cache", str(CLIP_CACHE_DIR), "-o", str(out)]
     total = renders[name]["total"] or 1
     tail = ""
+    render_log = logging.getLogger("clipbench.render")
+    render_log.info("%s: rendering to %s", name, out)
+    began = time.monotonic()
     try:
         proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, errors="replace")
         buf = ""
@@ -1584,13 +1603,16 @@ def run_render(name, hook, folder, flags, cuts=None, out=None):
                 renders[name] = {**renders[name], "pct": pct, "message": "Rendering"}
         code = proc.wait()
     except OSError as err:
+        render_log.exception("%s: couldn't start the render", name)
         renders[name] = {"state": "error", "message": f"Couldn't start the render: {err}"}
         return
     if code == 0 and out.is_file():
+        render_log.info("%s: done in %.0fs, %d bytes", name, time.monotonic() - began, out.stat().st_size)
         renders[name] = {"state": "done", "pct": 100, "message": "Done", "folder": str(folder.relative_to(ROOT)) if folder.is_relative_to(ROOT) else str(folder),
                          "size": out.stat().st_size, "stamp": int(out.stat().st_mtime)}
         return
     lines = [ln.strip() for ln in tail.replace("\r", "\n").split("\n") if ln.strip()]
+    render_log.error("%s: render failed with code %s after %.0fs\n%s", name, code, time.monotonic() - began, "\n".join(lines[-12:]))
     renders[name] = {"state": "error", "message": (lines[-1] if lines else "The render failed")[:300]}
 
 
@@ -1802,7 +1824,7 @@ def guarded_download(run, job_id, *args, project=None):
         if downloads[job_id].get("state") == "done" and downloads[job_id].get("file"):
             prepare_after_download(downloads[job_id]["file"])
     except Exception as err:
-        print(f"download {job_id} failed: {err!r}", file=sys.stderr)
+        log.exception("download {job_id}")
         downloads[job_id] = {**downloads[job_id], "state": "error", "message": f"The download failed: {err}"[:300]}
 
 
@@ -2604,8 +2626,21 @@ def export_cuts(name, project, directory=None):
 class Handler(BaseHTTPRequestHandler):
     server_version = "ClipBench"
 
+    def handle_one_request(self):
+        self.started = time.monotonic()
+        super().handle_one_request()
+
     def log_message(self, fmt, *args):
         pass
+
+    def log_request(self, code="-", size="-"):
+        status = int(code) if str(code).isdigit() else 0
+        level = logbook.request_level(self.command or "", self.path or "", status)
+        if level is None:
+            return
+        started = getattr(self, "started", None)
+        taken = f" {round((time.monotonic() - started) * 1000)}ms" if started else ""
+        http_log.log(level, "%s %s %s%s", self.command, self.path, code, taken)
 
     def host_ok(self):
         host = (self.headers.get("Host") or "").split(":")[0]
@@ -3252,6 +3287,7 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true")
     a = ap.parse_args()
+    log.info("starting %s on port %s, python %s", ROOT, a.port, sys.version.split()[0])
     if not (UI_DIR / "index.html").is_file():
         sys.exit(f"missing UI: {UI_DIR / 'index.html'}")
     global store, publisher, video_stats
@@ -3270,14 +3306,13 @@ def main():
     atexit.register(recorder.clear)
     threading.Thread(target=warm_cuts, daemon=True).start()
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
+        server = LoggedServer(("127.0.0.1", a.port), Handler)
     except OSError as err:
         sys.exit(f"Can't start on port {a.port}: {err.strerror}. Is the clip bench already running? "
                  f"Stop it, or use --port to pick another.")
     url = f"http://127.0.0.1:{a.port}/"
     print(f"Clip bench on {url}  (Ctrl+C to stop)")
     print(f"Log file: {LOG_FILE}")
-    print(f"started on {url}", file=sys.stderr)
     if not a.no_open:
         webbrowser.open(url)
     try:

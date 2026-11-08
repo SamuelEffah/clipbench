@@ -54,6 +54,7 @@ The watermark and title card take the channel's name and handle from this connec
 | `CLIPBENCH_DATA` | Database and account state only | `$CLIPBENCH_WORKSPACE/data` |
 | `CLIPBENCH_LLM` | Ollama model used to rank suggestions | best installed model |
 | `OLLAMA_HOST` | Ollama server | `http://127.0.0.1:11434` |
+| `CLIPBENCH_LOG` | `debug` also logs every API request to `workspace/logs/clipbench.log` | `info` |
 
 ## Layout
 
