@@ -21,7 +21,7 @@ const sources={a:{id:'a',name:'Source.mp4'}},byPath=src=>sources[src];
 const state={project:{clips:Array.from({length:200},(_,i)=>({src:'a',in:i,out:i+1,note:'clip '+i}))},sel:-1};
 const picked=new Set(),voiceWorking=new Set(),clipPeaks=new Map();
 const laneOf=()=> 'top',laneLocked=()=>false,laneCount=()=>1;
-const outLen=c=>c.out-c.in,clipName=()=> 'Source',esc=String,voiceKey=c=>c.in;
+const outLen=c=>c.out-c.in,clipName=()=> 'Source',esc=String,voiceKey=c=>c.in,voiceEstimate=()=>'about 5s';
 const volumeOf=c=>c.volume??1,MAX_VOLUME=2,SND_NS='svg';
 const requestAnimationFrame=fn=>frames.push(fn),drawClipWave=()=>wavePaints++;
 const paintWhenVisible=(el,paint)=>paint();
