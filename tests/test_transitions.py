@@ -86,7 +86,7 @@ class TransitionRenderTests(unittest.TestCase):
 
     def pixel(self, path, frame):
         out = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-vf", f"select='eq(n,{frame})',scale=2:2,format=rgb24",
-                              "-vsync", "0", "-frames:v", "1", "-f", "rawvideo", "-"], capture_output=True)
+                              "-fps_mode", "passthrough", "-frames:v", "1", "-f", "rawvideo", "-"], capture_output=True)
         return tuple(out.stdout[:3])
 
 
@@ -96,7 +96,7 @@ class CustomTransitionTests(unittest.TestCase):
         expr = make_short.TRANSITION_EXPR[name]
         graph = f"[0][1]xfade=transition=custom:expr='{expr}':duration=1:offset=0.5,select='eq(n,{frame})',scale=2:2,format=rgb24"
         out = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=red:s=64x64:r=30:d=2", "-f", "lavfi", "-i", "color=blue:s=64x64:r=30:d=2",
-                              "-filter_complex", graph, "-vsync", "0", "-frames:v", "1", "-f", "rawvideo", "-"], capture_output=True)
+                              "-filter_complex", graph, "-fps_mode", "passthrough", "-frames:v", "1", "-f", "rawvideo", "-"], capture_output=True)
         return tuple(out.stdout[:3])
 
     def test_the_outgoing_clip_is_shown_first_and_the_incoming_clip_last(self):

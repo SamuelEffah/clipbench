@@ -4,7 +4,7 @@ from tests.test_workflow_tools import UI, run_js
 
 class PresetsAndReview(unittest.TestCase):
     def test_presets_exclude_media_and_apply_only_to_short_top_lane(self):
-        source = (UI / 'panels.js').read_text().split('// Browser-local recipes', 1)[1].split('\n', 1)[1]
+        source = (UI / 'panels.js').read_text().split('// Browser-local recipes', 1)[1].split('\n', 1)[1].split('// Per-clip grading', 1)[0]
         run_js(r'''
 const assert=require('assert');const nodes={};const $=id=>nodes[id]||(nodes[id]={value:'',replaceChildren(){},close(){}});
 const store=new Map();const localStorage={getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)};

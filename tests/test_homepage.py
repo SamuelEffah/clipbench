@@ -30,7 +30,7 @@ class HomeRoutes(unittest.TestCase):
         html = (clipper.UI_DIR / 'home.html').read_text()
         self.assertNotIn('/app.js', html)
         self.assertIn('src="/assets/mars.jpg"', html)
-        self.assertIn('href="/editor"', html)
+        self.assertIn("location.assign('/editor')", (clipper.UI_DIR / 'home.js').read_text())
         self.assertNotIn('planetRotate', (clipper.UI_DIR / 'home.css').read_text())
 
     def test_account_flow(self):

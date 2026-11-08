@@ -251,7 +251,7 @@ def tone_source(path, colour, hz, seconds=3):
 
 def centre_pixel(video, frame):
     out = subprocess.run(["ffmpeg", "-v", "error", "-i", str(video), "-vf", f"select='eq(n,{frame})',crop=2:2:(iw-2)/2:(ih-2)/2,format=rgb24",
-                          "-vsync", "0", "-frames:v", "1", "-f", "rawvideo", "-"], capture_output=True, check=True)
+                          "-fps_mode", "passthrough", "-frames:v", "1", "-f", "rawvideo", "-"], capture_output=True, check=True)
     return tuple(out.stdout[:3])
 
 
