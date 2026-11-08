@@ -1029,7 +1029,8 @@ def run_voice(job_id, src, start, end):
 
 WHISPER_MODEL = "small"
 WHISPER_CACHE = Path.home() / ".cache" / "whisper"
-WHISPER_HINT = "Speech to text isn't installed. In Terminal run: pip3 install faster-whisper"
+WHISPER_HINT = "Speech to text isn't installed. In Terminal run: ./setup.sh --ai"
+SLOW_ENGINE_HINT = "on the CPU, which takes minutes; ./setup.sh --ai installs the fast engine"
 MAX_CAPTION = 120
 MAX_TRANSCRIBE = 60.0
 transcripts = {}
@@ -1068,6 +1069,15 @@ def speech_engine():
     return "fast" if fast_speech.available() else shutil.which("whisper")
 
 
+def listening_message(exe, first_run):
+    """Status for a listening job: plain for the in-process engines, a warning when the whisper command line is all there is."""
+    if exe in ("mlx", "fast"):
+        return "Listening"
+    if first_run:
+        return f"Downloading the speech model, first time only, then listening {SLOW_ENGINE_HINT}"
+    return f"Listening {SLOW_ENGINE_HINT}"
+
+
 def start_transcribe(src, start, end, timed=False, task="translate"):
     """Share an in-flight listening request; finished and failed jobs remain retryable."""
     exe = speech_engine()
@@ -1085,7 +1095,7 @@ def start_transcribe(src, start, end, timed=False, task="translate"):
         if pending and pending.get("state") == "working":
             return pending
         job = {"id": hashlib.sha1(f"{src}{start}{end}{time.time()}".encode()).hexdigest()[:12], "state": "working",
-               "message": "Downloading the speech model, first time only" if first_run else "Listening"}
+               "message": listening_message(exe, first_run)}
         transcripts[job["id"]] = job
         _pending_transcribes[key] = job["id"]
     try:

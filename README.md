@@ -34,6 +34,10 @@ The app opens at `http://127.0.0.1:8765`.
 ./start.sh --port 8766 --no-open   # another port, no browser window
 ```
 
+Run `./setup.sh --ai` before finding clips. Without it there is no speech engine, and
+listening either stops with a hint or, if a `whisper` command is on your PATH, runs on
+the CPU and takes minutes per video.
+
 ## Connect YouTube
 
 1. In Google Cloud Console, enable the YouTube Data API v3 and create an OAuth client of type Desktop app.
