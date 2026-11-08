@@ -14,8 +14,19 @@ if ! command -v brew >/dev/null; then
   echo 'Install Homebrew from https://brew.sh, then rerun ./setup.sh.' >&2
   exit 1
 fi
-brew install python@3.11 ffmpeg
-PYTHON="$(brew --prefix python@3.11)/bin/python3.11"
+# ffmpeg-full, not ffmpeg: the plain formula no longer has the drawtext and subtitles filters.
+brew install python@3.11 ffmpeg-full
+# The bottle Homebrew just poured is not always usable on this exact macOS build, so take
+# the first interpreter that actually works rather than the one that was just installed.
+PYTHON="$(tools/pick_python.sh \
+  "$(brew --prefix python@3.11)/bin/python3.11" \
+  "$(brew --prefix)/bin/python3.12" "$(brew --prefix)/bin/python3.13" \
+  "$(brew --prefix)/bin/python3.14" python3)"
+echo "Using $PYTHON"
+if [[ -e .venv ]] && ! .venv/bin/python -m pip --version >/dev/null 2>&1; then
+  echo 'Replacing the incomplete .venv left by an earlier attempt.'
+  rm -rf .venv
+fi
 "$PYTHON" -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 requirements=requirements.txt

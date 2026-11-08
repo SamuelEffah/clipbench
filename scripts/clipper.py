@@ -35,6 +35,7 @@ from copy import deepcopy
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+import ffmpeg_env
 import reframe
 import fast_speech
 import mlx_speech
@@ -3231,6 +3232,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    ffmpeg_env.activate()
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true")

@@ -19,6 +19,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 import clip_cache
+import ffmpeg_env
 import tracking
 from color_grade import GRADE_DEFAULTS, GRADE_RANGES, grade_filter
 
@@ -1370,6 +1371,7 @@ def voice_mix_graph(clip_idx, voice_idx, music_idx, voice_delay, music_vol, dur)
 
 
 def main():
+    ffmpeg_env.activate()
     p = argparse.ArgumentParser()
     p.add_argument("clip", nargs="?", help="default source; optional when every cut names its own file")
     p.add_argument("--start", type=parse_time, default=0, help="seconds or [h:]mm:ss")

@@ -24,8 +24,10 @@ Everything runs on your Mac. Nothing leaves it except what you choose to upload.
 ./start.sh
 ```
 
-Setup installs Python 3.11 and FFmpeg through Homebrew, creates `.venv`, and creates the
-`workspace/` folder. It is safe to rerun. The app opens at `http://127.0.0.1:8765`.
+Setup installs Python and FFmpeg (`ffmpeg-full`, the build with caption filters) through
+Homebrew, uses the first working Python 3.10 or newer it finds, creates `.venv`, and
+creates the `workspace/` folder. It is safe to rerun.
+The app opens at `http://127.0.0.1:8765`.
 
 ```sh
 ./setup.sh --ai                    # speech to text, vocal separation, person tracking

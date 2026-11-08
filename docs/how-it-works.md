@@ -22,7 +22,7 @@ video becomes a published Short. The README covers installing and starting.
 | Sound | `voice_isolation.py`, `instrumental.py`, `clip_beat.py`, `soundbank.py`, `assemble_voice.py` | Demucs separation, beat detection, sound search and narration assembly. |
 | Live | `live.js`, `liverec.py`, `streamers.py` | Watch a YouTube or Twitch stream in the editor, mark a stretch, and the server fetches just that stretch. |
 | YouTube | `youtube.py`, `publisher.py`, `video_stats.py`, `shorts.py` | OAuth for a Desktop client, resumable upload, and hourly reads of views, likes, retention and the channel's own videos. |
-| Tools | `tools/` | Setup helpers: create the workspace, relocate an old install, fetch models, check the environment, export a starter pack. |
+| Tools | `tools/` | Setup helpers: pick a working Python, create the workspace, relocate an old install, fetch models, check the environment, export a starter pack. |
 
 ## Where things live
 
