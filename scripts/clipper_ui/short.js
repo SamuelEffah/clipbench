@@ -3,7 +3,6 @@
 // timeline and state.project.other is the clip bank; in Clip mode they swap. See canon() and orient() in app.js.
 
 const CLIP_MIME = "application/x-clip";
-const TL_MIME = "application/x-timeline";
 const LANE_NAMES = {top: "Lane 1", bottom: "Lane 2", third: "Lane 3", fourth: "Lane 4"};
 const TL_SECONDS = 60;
 const stlBody = $("stlBody");
@@ -88,14 +87,8 @@ function dropOnLane(e, lane) {
   const k = slotFromX(e, lane);
   dragPx = 0;
   clearSlots();
-  const moved = e.dataTransfer.getData(TL_MIME);
   const dropped = e.dataTransfer.getData(CLIP_MIME);
-  if (laneLocked(lane) || (moved !== "" && blockedByLock(Number(moved)))) return lockedToast();
-  if (moved !== "") {
-    moveClip(Number(moved), lane, k);
-    changed();
-    return restartPreviewAt(state.sel);
-  }
+  if (laneLocked(lane)) return lockedToast();
   if (!dropped) return;
   try {
     const at = insertClip(JSON.parse(dropped), lane, k);
@@ -207,7 +200,6 @@ function clipBlock(c, gi, left, width, dim) {
   b.style.width = `${Math.max(width, 28)}px`;
   b.style.backgroundImage = c.thumb ? `url(${JSON.stringify(c.thumb)})` : "";
   b.tabIndex = 0;
-  b.draggable = !laneLocked(laneOf(c));
   b.classList.toggle("locked", laneLocked(laneOf(c)));
   b.dataset.gi = gi;
   b.title = `${v ? v.name.replace(/\.[^.]+$/, "") : "Missing video"}, ${outLen(c).toFixed(1)}s`;
@@ -221,21 +213,18 @@ function clipBlock(c, gi, left, width, dim) {
       h.onclick = ev => ev.stopPropagation();
     }
   }
-  b.addEventListener("pointerdown", e => { if (e.altKey && !e.button && !e.target.closest(".stl-del, .th") && !blockedByLock(gi)) slipOnTimeline(e, gi, b); });
+  b.addEventListener("pointerdown", e => {
+    if (e.altKey && !e.button && !e.target.closest(".stl-del, .th") && !blockedByLock(gi)) return slipOnTimeline(e, gi, b);
+    if (!razor) startLaneDrag(e, gi, b);
+  });
   b.onclick = e => {
+    if (b.dataset.moved) return void delete b.dataset.moved;
     if (razor) return razorCut(gi, b, e);
     if (e.shiftKey || e.metaKey || e.ctrlKey) return pickMore(gi, e);
     pickClip(gi);
     restartPreviewAt(isTop(c) ? gi : preview.idx);
   };
   b.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickClip(gi); } };
-  b.ondragstart = e => {
-    e.dataTransfer.setData(TL_MIME, String(gi));
-    e.dataTransfer.effectAllowed = "move";
-    dragPx = b.offsetWidth;
-    requestAnimationFrame(() => b.classList.add("dragging"));
-  };
-  b.ondragend = () => { b.classList.remove("dragging"); b.style.transform = ""; dragPx = 0; clearSlots(); };
   b.ondragover = e => { if (isEffectDrag(e)) { e.preventDefault(); b.classList.add("fx-over"); } };
   b.ondragleave = () => b.classList.remove("fx-over");
   b.ondrop = e => {
@@ -340,27 +329,52 @@ function shortRuler(span, topLen) {
 }
 
 // Drag the end of the selected clip to trim it. Dragging the left end moves its in point, the right end its out point.
+// Everything on the timeline that moves when clip gi changes length, measured once when a trim starts: the clips after it
+// in its lane and their sound, which shift by the change, and its own sound and the caption over it, which grow with it.
+function rippleLane(gi, lane) {
+  const clips = state.project.clips, inLane = i => laneOf(clips[i]) === lane, after = i => i > gi && inLane(i);
+  const blocks = [...stlBody.querySelectorAll(".stl-clip")].filter(b => after(Number(b.dataset.gi)));
+  const sounds = [...stlBody.querySelectorAll(".stl-snd")];
+  const chips = lane === "top" ? [...stlBody.querySelectorAll(".stl-cap")] : [];
+  const own = [...sounds.filter(s => Number(s.dataset.gi) === gi), ...chips.filter(ch => Number(ch.dataset.head) <= gi && gi <= Number(ch.dataset.last))]
+    .map(el => ({el, width: parseFloat(el.style.width) || 0}));
+  const shifted = [...blocks, ...sounds.filter(s => after(Number(s.dataset.gi))), ...chips.filter(ch => Number(ch.dataset.head) > gi)];
+  return {
+    apply(dx) {
+      for (const el of shifted) el.style.transform = dx ? `translateX(${dx}px)` : "";
+      for (const {el, width} of own) el.style.width = `${Math.max(28, width + dx)}px`;
+    },
+    clear() { for (const el of shifted) el.style.transform = ""; },
+  };
+}
+
 function trimOnTimeline(e, gi, side, block) {
   if (blockedByLock(gi)) return;
   if (e.shiftKey && rollOnTimeline(e, gi, side, block)) return;
   e.preventDefault();
   e.stopPropagation();
-  const c0 = state.project.clips[gi], v = byPath(c0.src), speed = speedOf(c0), x0 = e.clientX, left0 = parseFloat(block.style.left) || 0;
+  const c0 = state.project.clips[gi], v = byPath(c0.src), speed = speedOf(c0), x0 = e.clientX, width0 = outLen(c0) * stlPps;
+  // A lane is a chain, so the clip keeps its left edge on either trim and the lane after it follows the change live.
+  const ripple = rippleLane(gi, laneOf(c0));
   let next = c0;
   block.setPointerCapture(e.pointerId);
+  stlBody.classList.add("trimming");
   const move = ev => {
     const dt = (ev.clientX - x0) / stlPps * speed;
     next = side === "l" ? {...c0, in: Math.min(Math.max(0, c0.in + dt), c0.out - MIN_CLIP)}
       : {...c0, out: Math.max(Math.min(v ? v.duration : Infinity, c0.out + dt), c0.in + MIN_CLIP)};
     next = snapTrim(next, c0, gi, side, v, ev.altKey);
-    block.style.width = `${Math.max(outLen(next) * stlPps, 28)}px`;
-    if (side === "l") block.style.left = `${left0 + (outLen(c0) - outLen(next)) * stlPps}px`;
+    const width = outLen(next) * stlPps;
+    block.style.width = `${Math.max(width, 28)}px`;
+    ripple.apply(width - width0);
   };
   const up = () => {
     block.removeEventListener("pointermove", move);
     block.removeEventListener("pointerup", up);
     block.removeEventListener("pointercancel", up);
     hideSnapLine();
+    stlBody.classList.remove("trimming");
+    ripple.clear();
     if (next === c0) return;
     setClipField(gi, {in: next.in, out: next.out});
     restartPreviewAt(gi);
@@ -396,7 +410,7 @@ function laneRow(lane, list, pps, topLen) {
   track.classList.toggle("lane-muted", laneMuted(lane) || laneDimmedBySolo(lane));
   track.classList.toggle("lane-locked", laneLocked(lane));
   track.ondragover = e => {
-    if (e.dataTransfer.types.includes(CLIP_MIME) || e.dataTransfer.types.includes(TL_MIME)) {
+    if (e.dataTransfer.types.includes(CLIP_MIME)) {
       e.preventDefault();
       showSlot(e, lane);
     }
@@ -602,6 +616,7 @@ function textRow(list, pps) {
     chip.className = "stl-cap" + (selected ? " sel" : "");
     chip.append(Object.assign(document.createElement("span"), {textContent: run.text}), Object.assign(document.createElement("i"), {className: "cap-r", title: "Drag to make the caption cover more or fewer clips"}));
     chip.title = `Caption: ${run.text}`;
+    Object.assign(chip.dataset, {head: run.head, last: run.last});
     Object.assign(chip.style, {left: `${start[run.head] * pps}px`, width: `${Math.max((end[run.last] - start[run.head]) * pps, 28)}px`});
     chip.onclick = () => { if (chip.dataset.moved) return void delete chip.dataset.moved; pickClip(run.head); restartPreviewAt(run.head); };
     chip.onpointerdown = e => (e.target.classList.contains("cap-r") ? resizeCaption(e, run, chip, track) : dragCaption(e, run.head, chip, track));

@@ -2259,3 +2259,10 @@ body[data-mode="short"] .stl-len{color:#ececec;text-shadow:0 1px 3px #000}
 #clipProps #gradeReset{padding:3px 0 3px 8px;color:var(--dim);font-size:11px;letter-spacing:0;text-transform:none}
 #clipProps #gradeReset:hover{color:var(--text);background:transparent}
 
+/* Moving a clip with the pointer: a ghost of it rides under the hand while the lane opens a gap for it. */
+.stl-clip{touch-action:none}
+.stl-drag-ghost{position:fixed;margin:0;opacity:.88;box-shadow:0 8px 24px #000a;pointer-events:none;z-index:60;cursor:grabbing;transition:none}
+body.lane-dragging{cursor:grabbing;user-select:none}
+/* Trimming moves the rest of the lane live, so nothing may ease behind the handle. */
+.trimming .stl-clip,.trimming .stl-snd,.trimming .stl-cap{transition:none}
+.trimming .stl-seam{opacity:0}
