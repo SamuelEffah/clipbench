@@ -25,8 +25,9 @@ class DraftLogic(unittest.TestCase):
     def test_moments_of_short_length_come_first_in_their_own_order_then_the_best_of_the_rest(self):
         self.check(r'''
 const moments = [{in: 0, out: 12}, {in: 20, out: 55}, {in: 100, out: 170}, {in: 200, out: 232}, {in: 300, out: 345}];
-assert.deepEqual(draftPicks(moments).map(m => m.in), [20, 200, 300]);
-assert.deepEqual(draftPicks(moments.slice(0, 3)).map(m => m.in), [20, 0, 100]);
+assert.deepEqual(draftPicks(moments).map(m => m.in), [20], 'one draft per press');
+assert.deepEqual(draftPicks(moments, 3).map(m => m.in), [20, 200, 300]);
+assert.deepEqual(draftPicks(moments.slice(0, 3), 3).map(m => m.in), [20, 0, 100]);
 assert.deepEqual(draftPicks([]), []);
 assert.deepEqual(draftPicks(moments, 1).map(m => m.in), [20]);
 ''')

@@ -1,8 +1,8 @@
-// Draft Shorts: from the open video's best moments, make a few complete Shorts as new projects, each laid out, captioned and trimmed to length,
-// so picking one and adjusting it is all that is left. Depends on app.js (state, api, toast, loadProject, flushSave, projectNames), suggest.js
+// Draft Short: from the open video's best moment, make one complete Short as a new project, laid out, captioned and trimmed to length,
+// so adjusting it is all that is left. Depends on app.js (state, api, toast, loadProject, flushSave, projectNames), suggest.js
 // (fetchSuggestions, suggestClip), short.js (setMode) and autolayout.js (autoLayout, autoBusy).
 const drafting = {on: false};
-const DRAFTS = 3;
+const DRAFTS = 1;  // one project per press; several at once piled up near-identical projects from the same video
 const DRAFT_LEN = [30, 60];  // seconds; a moment this long makes a Short on its own, since Auto trims it to the longest a Short runs
 const DRAFT_NAME_MAX = 60;  // the longest project name the server takes
 
@@ -52,8 +52,7 @@ async function draftShorts() {
       await flushSave();
       made.push(names[k]);
     }
-    if (made.length > 1) await loadProject(made[0]);
-    toast(made.length > 1 ? `${made.length} drafts made, ${made.join(", ")}. This is the first` : `One draft made, ${made[0]}`);
+    toast(`Draft made, ${made[0]}`);
   } catch (err) {
     toast(made.length ? `${err.message}. ${made.length} ${made.length > 1 ? "drafts were" : "draft was"} made` : err.message || "Couldn't draft Shorts");
   } finally {
