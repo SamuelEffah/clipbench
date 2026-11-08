@@ -25,6 +25,21 @@ def ffmpeg_problems(path):
     return errors
 
 
+def opencv_problems(cv2):
+    """A present OpenCV must still have the cascade face detector, which OpenCV 5 removed."""
+    if cv2 is None or hasattr(cv2, "CascadeClassifier"):
+        return []
+    return [f"OpenCV {cv2.__version__} has no face detector (OpenCV 5 dropped it); rerun ./setup.sh for the 4.x build"]
+
+
+def loaded_opencv():
+    try:
+        import cv2
+    except ImportError:
+        return None
+    return cv2
+
+
 def problems():
     errors = []
     if sys.version_info < (3, 10):
@@ -32,6 +47,7 @@ def problems():
     for module in ("PIL", "numpy", "cv2"):
         if importlib.util.find_spec(module) is None:
             errors.append(f"Missing Python module: {module}; rerun ./setup.sh")
+    errors += opencv_problems(loaded_opencv())
     errors += ffmpeg_problems(ffmpeg_env.prefer_full_ffmpeg(os.environ))
     fonts = Path("/System/Library/Fonts")
     for font in ("Supplemental/Impact.ttf", "Supplemental/Arial Bold.ttf", "Supplemental/Arial.ttf", "Apple Color Emoji.ttc"):

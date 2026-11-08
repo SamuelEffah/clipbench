@@ -3063,6 +3063,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"error": "unknown video"}, 400)
             try:
                 return self.send_json(reframe_analysis(src, start, end))
+            except reframe.NoFaceDetector as err:
+                return self.send_json({"error": str(err)}, 400)
             except ImportError:
                 return self.send_json({"error": "AI reframe needs OpenCV: pip install opencv-python-headless"}, 400)
             except (ValueError, OSError, subprocess.SubprocessError) as err:

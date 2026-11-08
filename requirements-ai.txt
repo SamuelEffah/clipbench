@@ -3,4 +3,6 @@ faster-whisper
 mlx-whisper; sys_platform == 'darwin' and platform_machine == 'arm64'
 demucs
 ultralytics
+# ultralytics asks for opencv-python; keep it on 4.x, OpenCV 5 has no cascade face detector.
+opencv-python>=4.8,<5
 lap>=0.5

@@ -154,3 +154,14 @@ class FollowFromAnyFrameTests(unittest.TestCase):
         self.assertIsNotNone(found)
         self.assertAlmostEqual(found[0], 280, delta=3)
         self.assertIsNone(reframe.rematch(np.zeros((270, 480), np.uint8), (90, 90, 40, 40), gray[120:160, 280:320], 0.6))
+
+
+class FaceDetectorAvailabilityTests(unittest.TestCase):
+    def test_an_opencv_without_cascades_fails_with_the_setup_hint(self):
+        import types
+        bare = types.SimpleNamespace(data=types.SimpleNamespace(haarcascades=""))
+        with unittest.mock.patch.dict(sys.modules, {"cv2": bare}):
+            with self.assertRaises(reframe.NoFaceDetector) as caught:
+                reframe.cascade_detector()
+        self.assertIn("./setup.sh", str(caught.exception))
+        self.assertIsInstance(caught.exception, ImportError)

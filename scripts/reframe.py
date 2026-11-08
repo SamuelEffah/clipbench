@@ -51,9 +51,18 @@ def read_frames(src, start, end, step=None):
         proc.wait()
 
 
+class NoFaceDetector(ImportError):
+    """OpenCV is installed but has no cascade classifier (OpenCV 5 dropped it)."""
+
+
+FACE_DETECTOR_HINT = "This OpenCV has no face detector; OpenCV 5 dropped it. Rerun ./setup.sh to get the 4.x build back."
+
+
 def cascade_detector():
     """A detector for faces in a gray frame: the anime cascade when it has been added to scripts/models, then OpenCV's own."""
     import cv2
+    if not hasattr(cv2, "CascadeClassifier"):
+        raise NoFaceDetector(FACE_DETECTOR_HINT)
     paths = ([str(ANIME_CASCADE)] if ANIME_CASCADE.is_file() else []) + [cv2.data.haarcascades + "haarcascade_frontalface_default.xml"]
     cascades = [cv2.CascadeClassifier(p) for p in paths]
 
