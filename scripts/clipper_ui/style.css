@@ -1974,11 +1974,11 @@ dialog#projDlg[open]{display:flex;flex-direction:column}
 .hirow[hidden]{display:none}
 .hirow select{flex:0 0 auto}
 
-.mrow{display:flex;gap:6px;align-items:stretch}
+.mrow{display:flex;align-items:flex-start}
 .mrow .mtrack{flex:1;min-width:0}
-.voxbtn{flex:none;font:inherit;font-size:11px;color:var(--dim);background:transparent;border:1px solid var(--line2,#3a3a40);border-radius:8px;padding:0 9px;cursor:pointer}
-.voxbtn:hover:not(:disabled){color:var(--text);border-color:var(--dim)}
-.voxbtn:disabled{opacity:.6;cursor:default}
+.mmore{flex:none;width:28px;height:28px;margin:12px 10px 0 0;padding:0;display:flex;align-items:center;justify-content:center;border-radius:7px;color:var(--dim);background:transparent;opacity:.55}
+.mrow:hover .mmore,.mmore:focus-visible,.mmore[aria-expanded="true"]{opacity:1}
+.mmore:hover{color:var(--text);background:#ffffff12}
 
 /* Dialogue search: a field above the clips, answered with the same rows Suggest uses */
 .dsearch{flex:none;display:flex;align-items:center;gap:8px;margin:8px 10px;padding:0 6px 0 10px;height:32px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}

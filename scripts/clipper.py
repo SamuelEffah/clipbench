@@ -2102,6 +2102,24 @@ def remove_video(vid):
     return how
 
 
+def remove_audio(aid):
+    """Take a song or sound out of the audio library. The file goes to the Trash, so it can be put back."""
+    path = audio_registry.get(aid)
+    if not path:
+        scan_audio()
+        path = audio_registry.get(aid)
+    if not path or not path.is_file():
+        raise ValueError("That sound isn't in the audio library")
+    if path.parent not in AUDIO_DIRS:
+        raise ValueError("That file isn't in the audio folders")
+    TRASH_DIR.mkdir(exist_ok=True)
+    target = TRASH_DIR / path.name
+    if target.exists():
+        target = TRASH_DIR / f"{path.stem} {int(time.time())}{path.suffix}"
+    shutil.move(str(path), str(target))
+    audio_registry.pop(aid, None)
+
+
 CUT_DIR = WORKSPACE / "clips" / ".cuts"
 MAX_CUT_SECONDS = 900
 CUT_PRUNE_DAYS = 7
@@ -3008,6 +3026,12 @@ class Handler(BaseHTTPRequestHandler):
         if m := re.fullmatch(r"/api/remove-video/([0-9a-f]{12})", path):
             try:
                 return self.send_json({"ok": True, "how": remove_video(m.group(1))})
+            except (ValueError, OSError) as err:
+                return self.send_json({"error": str(err)}, 400)
+        if m := re.fullmatch(r"/api/remove-audio/([0-9a-f]{12})", path):
+            try:
+                remove_audio(m.group(1))
+                return self.send_json({"ok": True})
             except (ValueError, OSError) as err:
                 return self.send_json({"error": str(err)}, 400)
         if path == "/api/cuts/warm":

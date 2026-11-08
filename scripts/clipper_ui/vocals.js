@@ -26,14 +26,37 @@ async function removeVocals(f) {
   }
 }
 
-function voxButton(f, names) {
-  if (!canRemoveVocals(f, names)) return null;
-  const busy = voxBusy.has(f.id);
+// Take a song or sound out of the library. The file goes to the Trash, and any copy of it on this Short's timeline goes too.
+async function deleteMusic(f) {
+  try {
+    await api(`/api/remove-audio/${f.id}`, "POST", {});
+    if (audioOf().some(a => a.file === f.id)) {
+      state.project = {...state.project, audio: audioOf().filter(a => a.file !== f.id)};
+      state.audioSel = null;
+      changed();
+    }
+    await refreshAudio();
+    toast(`${f.name} moved to the Trash`);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+// One quiet menu button per row instead of a text button that squeezed the title.
+function musicMenu(f, names) {
   const b = document.createElement("button");
-  b.className = "voxbtn";
-  b.textContent = busy ? "Working" : "No vocals";
-  b.title = "Make a copy of this song without the singing";
-  b.disabled = busy;
-  b.onclick = () => removeVocals(f);
+  b.className = "mmore";
+  b.setAttribute("aria-label", `More for ${f.name}`);
+  b.title = "More";
+  b.innerHTML = '<svg class="i"><use href="#dots"/></svg>';
+  b.onclick = e => {
+    e.stopPropagation();
+    const r = b.getBoundingClientRect();
+    const busy = voxBusy.has(f.id);
+    openCtx(r.right, r.bottom + 4, [
+      ...(canRemoveVocals(f, names) || busy ? [{label: busy ? "Taking the singing out" : "Make a copy with no vocals", off: busy, run: () => removeVocals(f)}, "-"] : []),
+      {label: "Move to Trash", run: () => deleteMusic(f)},
+    ]);
+  };
   return b;
 }

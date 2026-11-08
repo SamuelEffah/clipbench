@@ -180,19 +180,15 @@ function paintMusic() {
       b.title = "Click to add, or drag onto the timeline";
       b.ondragstart = e => startSoundDrag(e, f);
       b.ondragend = endSoundDrag;
-      b.innerHTML = `<span class="wv"><svg class="i"><use href="#${isSong(f) ? "i-music" : "vol"}"/></svg></span><span><b>${esc(f.name)}</b><small class="num">${secs(f.duration)}${on ? (isSong(f) ? ", under the whole Short" : ", at the playhead") : ""}</small></span>${on ? '<svg class="i ck"><use href="#c-check"/></svg>' : ""}`;
+      b.innerHTML = `<span class="wv"><svg class="i"><use href="#${isSong(f) ? "i-music" : "vol"}"/></svg></span><span><b>${esc(f.name)}</b><small class="num">${secs(f.duration)}${on ? (isSong(f) ? ", under the whole Short" : ", at the playhead") : ""}${voxBusy.has(f.id) ? ", taking the singing out" : ""}</small></span>${on ? '<svg class="i ck"><use href="#c-check"/></svg>' : ""}`;
       b.onclick = () => {
         const item = songItem(f);
         if (item) return removeAudio(item.id);
         addAudio(f, isSong(f) ? 0 : Math.round((preview.elapsed || 0) * 10) / 10);
       };
-      const vox = voxButton(f, names);
-      let row = b;
-      if (vox) {
-        row = document.createElement("div");
-        row.className = "mrow";
-        row.append(b, vox);
-      }
+      const row = document.createElement("div");
+      row.className = "mrow";
+      row.append(b, musicMenu(f, names));
       next.set(f.id, {file: f, key, row});
       return row;
     });
