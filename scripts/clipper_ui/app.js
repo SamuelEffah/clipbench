@@ -1628,7 +1628,9 @@ function leaveAt(clip) {
 
 // Play one clip of the Short in the preview players, from its own file when it has one.
 async function previewRange(clip, onDone, guard, from) {
-  const file = await clipFileSoon(clip);
+  // Play from whatever is ready now: the clip's own file when it is saved, else the source. The file is made in the
+  // background for next time; waiting for it froze the playhead for the whole encode after every trim.
+  const file = clipFile(clip) || await clipFileSoon(clip);
   if (!file) return toast("Couldn't get that clip ready to play");
   const begin = from === undefined ? clip.in : from;
   const start = skipSeek => {
@@ -2060,8 +2062,11 @@ function playPreviewClip(i, run, from) {
   }
   preview.idx = i;
   preview.live = false;
-  if (state.mode !== "short") state.sel = i;
-  render();
+  // The Short station paints the playing clip every frame; only the clip station follows the selection.
+  if (state.mode !== "short") {
+    state.sel = i;
+    render();
+  }
   const next = nextTop(i);
   previewRange(clip, () => playPreviewClip(next, run), () => run === preview.run && preview.on, from);
   const upcoming = state.project.clips[next];

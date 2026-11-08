@@ -2096,7 +2096,7 @@ def remove_video(vid):
 
 CUT_DIR = WORKSPACE / "clips" / ".cuts"
 MAX_CUT_SECONDS = 900
-CUT_PRUNE_DAYS = 90
+CUT_PRUNE_DAYS = 7
 cuts = {}
 cut_slots = threading.Semaphore(2)
 cut_finished = threading.Condition()
