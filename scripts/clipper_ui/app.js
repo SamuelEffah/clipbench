@@ -2626,7 +2626,7 @@ document.addEventListener("keydown", e => {
   if (preview.on) {
     if (e.key === " " && e.target.tagName === "BUTTON") return;
     const pk = {" ": togglePreview, ArrowLeft: () => stepPreview(-1), ArrowRight: () => stepPreview(1)};
-    if (state.mode === "short") Object.assign(pk, {ArrowUp: () => selectLane(-1), ArrowDown: () => selectLane(1), Delete: removeSelected, Backspace: removeSelected, s: splitInShort, d: duplicateChosen, m: () => $("thMute").click()});
+    if (state.mode === "short") Object.assign(pk, {ArrowUp: () => selectLane(-1), ArrowDown: () => selectLane(1), Delete: removeSelected, Backspace: removeSelected, s: splitInShort, d: duplicateSelected, m: () => $("thMute").click()});
     else pk.Escape = closePreview;
     const act = pk[e.key] || pk[e.key.toLowerCase()];
     if (act) { e.preventDefault(); act(); }
@@ -2634,7 +2634,7 @@ document.addEventListener("keydown", e => {
   }
   const step = e.shiftKey ? 1 : FRAME;
   const keys = {
-    " ": togglePlay, i: markIn, o: markOut, s: splitClip, d: () => duplicateClip(state.sel), j: () => seekBy(-5), l: () => seekBy(5),
+    " ": togglePlay, i: markIn, o: markOut, s: splitClip, d: () => (inShort() && state.audioSel ? duplicateAudio(state.audioSel) : duplicateClip(state.sel)), j: () => seekBy(-5), l: () => seekBy(5),
     ArrowLeft: () => seekBy(-step), ArrowRight: () => seekBy(step),
     ...(!ownsEnter(e.target) ? {Enter: streaming() ? liveClip : clipIt} : {}),
     Tab: () => jumpScene(e.shiftKey ? -1 : 1), m: toggleMute, ArrowUp: () => nudgeVolume(1), ArrowDown: () => nudgeVolume(-1),

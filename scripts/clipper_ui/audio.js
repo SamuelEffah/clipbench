@@ -169,6 +169,20 @@ function removeAudio(id) {
   changed();
 }
 
+// A copy of a sound, trim and level and all, placed right after the original so the two sit end to end.
+function duplicateAudio(id) {
+  const a = audioOf().find(x => x.id === id);
+  if (!a) return;
+  const copy = {...a, id: newAudioId(), start: Number((a.start + a.dur).toFixed(2))};
+  state.project = {...state.project, audio: [...audioOf(), copy]};
+  state.audioSel = copy.id;
+  changed();
+  setTab("details");
+  toast(`${a.label} duplicated at ${secs(copy.start)}`);
+}
+
+const duplicateSelected = () => (audioOf().some(a => a.id === state.audioSel) ? duplicateAudio(state.audioSel) : duplicateChosen());
+
 function selectAudio(id) {
   state.audioSel = id;
   setTab("details");
@@ -277,6 +291,12 @@ function audioBlock(a, row, pps) {
   b.innerHTML = `<canvas class="aud-wave" aria-hidden="true"></canvas><i class="h l" aria-hidden="true"></i><span class="aud-name">${esc(a.label)}</span><span class="aud-len num">${secs(a.dur)}</span><i class="h r" aria-hidden="true"></i>`;
   b.onpointerdown = e => {
     dragAudio(e, b, a, e.target.classList.contains("l") ? "left" : e.target.classList.contains("r") ? "right" : "move");
+  };
+  b.oncontextmenu = e => {
+    e.preventDefault();
+    state.audioSel = a.id;
+    render();
+    openCtx(e.clientX, e.clientY, [{label: "Duplicate", key: "D", run: () => duplicateAudio(a.id)}, "-", {label: "Remove", key: "⌫", run: () => removeAudio(a.id)}]);
   };
   b.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectAudio(a.id); } };
   const paintLevel = addLevelEditor(b, a, pps);
@@ -537,7 +557,13 @@ function audioDetails(a) {
   remove.title = "Remove from the Short";
   remove.innerHTML = '<svg class="i"><use href="#trash"/></svg>';
   remove.onclick = () => removeAudio(a.id);
-  head.appendChild(remove);
+  const copy = document.createElement("button");
+  copy.className = "ico";
+  copy.setAttribute("aria-label", "Duplicate this sound");
+  copy.title = "Duplicate (D)";
+  copy.innerHTML = '<svg class="i"><use href="#copy"/></svg>';
+  copy.onclick = () => duplicateAudio(a.id);
+  head.append(copy, remove);
   const pct = v => (v === 0 ? "Muted" : `${Math.round(v * 100)}%`);
   const off = v => (v === 0 ? "Off" : secs(v));
   return [head,
