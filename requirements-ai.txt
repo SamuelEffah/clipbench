@@ -1,0 +1,6 @@
+-r requirements.txt
+faster-whisper
+mlx-whisper; sys_platform == 'darwin' and platform_machine == 'arm64'
+demucs
+ultralytics
+lap>=0.5

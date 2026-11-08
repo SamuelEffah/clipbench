@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clipbench — Welcome</title>
+<link rel="icon" type="image/svg+xml" href="/assets/planet-logo.svg?v=2">
+<meta name="application-name" content="Clipbench">
+<link rel="stylesheet" href="/home.css">
+<script src="/home.js" defer></script>
+<script src="/home-projects.js" defer></script>
+<script src="/planet.js" defer></script>
+</head>
+<body>
+<a class="home-brand" href="/" aria-label="Clipbench home"><img src="/assets/planet-logo.svg" alt="" width="24" height="24"><span>Clipbench</span></a>
+<main class="home" aria-label="Welcome to Clipbench">
+  <section class="planet-panel" aria-label="Mars">
+    <div class="planet">
+      <img id="planet-fallback" src="/assets/mars.jpg" alt="Mars photographed from space" width="540" height="810">
+      <canvas id="planet-canvas" role="img" aria-label="Mars slowly rotating on its axis" hidden></canvas>
+    </div>
+    </div>
+  </section>
+  <section class="connect-panel" aria-labelledby="home-title">
+    <div class="home-content">
+    <section id="home-project" aria-labelledby="resume-title" hidden>
+      <h1 id="resume-title">Welcome back</h1>
+      <div id="home-live" hidden>
+        <div class="home-lbl"><span>Live now</span></div>
+        <div id="home-live-rows"></div>
+      </div>
+      <div class="home-lbl"><span>Recent projects</span></div>
+      <div id="home-recent"></div>
+      <button class="home-new" data-new-project><span class="plus" aria-hidden="true">+</span>New project</button>
+    </section>
+    <div class="connect">
+      <svg class="youtube" viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="2" width="30" height="20" rx="6" fill="currentColor"/><path d="M13 7.5L21 12l-8 4.5z" fill="#1c1c1c"/></svg>
+      <h1 id="home-title">Connect your YouTube</h1>
+      <button class="primary" id="home-action" disabled><span id="home-action-text">Connect YouTube</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M14 7l5 5-5 5"/></svg></button>
+      <button class="skip" id="home-skip" data-new-project>New project</button>
+      <button class="skip" id="home-disconnect" hidden>Disconnect YouTube</button>
+      <p id="home-status" role="status" aria-live="polite" hidden></p>
+      <a id="home-signin" class="signin" target="_blank" rel="noopener noreferrer" hidden>Open Google sign-in</a>
+      <button class="skip" id="home-cancel" hidden>Cancel sign-in</button>
+    </div>
+    </div>
+  </section>
+</main>
+<footer><a href="https://space.jpl.nasa.gov/tmaps/mars.html" target="_blank" rel="noopener noreferrer">Mars imagery: NASA/JPL/USGS</a></footer>
+<dialog id="home-setup" aria-labelledby="setup-title">
+  <h2 id="setup-title">Set up YouTube</h2>
+  <ol>
+    <li>In Google Cloud Console, enable YouTube Data API v3 and configure the OAuth consent screen for your account.</li>
+    <li>Create a Desktop app OAuth client and download its JSON file.</li>
+    <li>Save it as <code>youtube_client.json</code> in your app’s <code>data/</code> folder (or your configured <code>CLIPBENCH_DATA</code> folder).</li>
+  </ol>
+  <p id="home-setup-status" role="status"></p>
+  <div class="dialog-actions"><button class="skip" data-new-project>Continue without YouTube</button><button class="secondary" id="home-setup-close">Close</button><button class="primary" id="home-recheck">Check again</button></div>
+</dialog>
+<dialog id="home-new" aria-labelledby="new-title">
+  <form id="home-new-form">
+    <header><h2 id="new-title">New project</h2><button type="button" id="home-new-close" aria-label="Close new project">×</button></header>
+    <label for="home-new-name">Project name</label>
+    <input id="home-new-name" name="name" maxlength="60" autocomplete="off" spellcheck="false" placeholder="Name your project" required pattern="[A-Za-z0-9_-]{1,60}" aria-describedby="home-new-error">
+    <p id="home-new-error" role="status" aria-live="polite"></p>
+    <div class="dialog-actions"><button type="button" class="secondary" id="home-new-cancel">Cancel</button><button type="submit" class="primary" id="home-new-create">Create</button></div>
+  </form>
+</dialog>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# Development environments and caches
+.DS_Store
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+coverage.xml
+.coverage
+htmlcov/
+dist/
+
+# Local media, projects, generated outputs, and user configuration
+/clips/
+/temp/
+/out/
+/projects/
+/music/
+/audio/
+/broll/
+/shorts/
+/data/
+/cuts/
+/narration/
+/voices/
+/thumbs/
+/assets/channel/
+*.mp4
+*.mkv
+*.mov
+*.log
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+scripts/models/*.pt
+
+# Design mockups stay local
+/mockup/

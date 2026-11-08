@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clipbench — Editor</title>
+<link rel="icon" type="image/svg+xml" href="/assets/planet-logo.svg?v=2">
+<meta name="application-name" content="Clipbench">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="play" viewBox="0 0 24 24"><path d="M7 4l12 8-12 8z"/></symbol>
+  <symbol id="playfill" viewBox="0 0 24 24"><path transform="translate(-1.6 0)" d="M8 5.2v13.6a.6.6 0 0 0 .9.5l11.3-6.8a.6.6 0 0 0 0-1L8.9 4.7a.6.6 0 0 0-.9.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="replay" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></symbol>
+  <symbol id="skipprev" viewBox="0 0 24 24"><path d="M6 5v14" stroke-width="2.4"/><path d="M19 5.6v12.8a.5.5 0 0 1-.8.4L9.4 12.4a.5.5 0 0 1 0-.8l8.8-6.4a.5.5 0 0 1 .8.4z" fill="currentColor"/></symbol>
+  <symbol id="skipnext" viewBox="0 0 24 24"><path d="M18 5v14" stroke-width="2.4"/><path d="M5 5.6v12.8a.5.5 0 0 0 .8.4l8.8-6.4a.5.5 0 0 0 0-.8L5.8 5.2a.5.5 0 0 0-.8.4z" fill="currentColor"/></symbol>
+  <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5S9.600 5.900 12 3.500z"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+  <symbol id="close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="back" viewBox="0 0 24 24"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></symbol>
+  <symbol id="fwd" viewBox="0 0 24 24"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></symbol>
+  <symbol id="star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z"/></symbol>
+  <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="in" viewBox="0 0 24 24"><path d="M9 4v16M9 12h11M16 8l4 4-4 4"/></symbol>
+  <symbol id="out" viewBox="0 0 24 24"><path d="M15 4v16M15 12H4M8 8l-4 4 4 4"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
+  <symbol id="split" viewBox="0 0 24 24"><path d="M12 3v18M7 8l-4 4 4 4M17 8l4 4-4 4"/></symbol>
+  <symbol id="trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"/></symbol>
+  <symbol id="dots" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18.5" cy="12" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="chevdown" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="live" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4"/></symbol>
+  <symbol id="download" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="vol" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+  <symbol id="mute" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></symbol>
+  <symbol id="eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="r-clips" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 5v14M16 5v14M3 10h5M3 14h5M16 10h5M16 14h5"/></symbol>
+  <symbol id="r-edit" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+  <symbol id="r-fx" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z"/></symbol>
+  <symbol id="r-music" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></symbol>
+  <symbol id="r-set" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></symbol>
+  <symbol id="r-shorts" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 9.5l3 2.5-3 2.5z"/></symbol>
+  <symbol id="c-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6a.6.6 0 0 0 .9.5l11.3-6.8a.6.6 0 0 0 0-1L8.9 4.7a.6.6 0 0 0-.9.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="c-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke-width="2.6"/></symbol>
+  <symbol id="c-prev" viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M19 6v12l-9-6z" fill="currentColor"/></symbol>
+  <symbol id="c-next" viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M5 6v12l9-6z" fill="currentColor"/></symbol>
+  <symbol id="c-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/></symbol>
+  <symbol id="c-split" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M8 5H5v14h3M16 5h3v14h-3" stroke-dasharray="3 2.4"/></symbol>
+  <symbol id="c-vol" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></symbol>
+  <symbol id="c-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/></symbol>
+  <symbol id="c-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="c-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+  <symbol id="c-shorts" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 9.5v5l4-2.5z" fill="currentColor"/></symbol>
+  <symbol id="i-clips" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 17V4M6 10l6-6 6 6M5 21h14"/></symbol>
+  <symbol id="i-chevleft" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-trans" viewBox="0 0 24 24"><path d="M4 6l8 6-8 6zM20 6l-8 6 8 6z"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></symbol>
+  <symbol id="i-look" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9M4 12h5M13 12h7"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/><circle cx="11" cy="12" r="2"/></symbol>
+  <symbol id="i-broll" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/><text x="14" y="17.2" font-size="8" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none">B</text></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></symbol>
+</svg>
+
+<div class="work">
+  <div class="swslot">
+    <div class="modes sw" role="tablist" aria-label="Mode">
+      <button role="tab" id="modeClip" aria-selected="true" title="Cut clips from your videos">Clips</button>
+      <button role="tab" id="modeShort" aria-selected="false" title="Arrange clips into a Short">Short</button>
+    </div>
+  </div>
+  <aside class="side" aria-label="Media">
+    <div class="shellhead">
+    <div class="pbox">
+      <svg class="i project-folder" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M3 9h18"/></svg>
+      <input class="pname" id="pname" aria-label="Open projects" aria-haspopup="dialog" autocomplete="off" value="untitled" spellcheck="false" readonly>
+      <button class="pchev" id="pchev" aria-label="Show projects" title="Projects" tabindex="-1"><svg class="i"><use href="#chevdown"/></svg></button>
+      <span class="saved" id="saved" role="status"></span>
+    </div>
+      <span class="saved" id="cutStatus" hidden role="status"></span>
+    </div>
+    <div class="tabs">
+      <button class="tab" id="tabMedia" aria-selected="true">Sources</button>
+      <button class="tab" id="tabFx" aria-selected="false">Effects</button>
+      <button class="tab" id="tabFav" aria-selected="false">Saved</button>
+      <button class="tab" id="tabAudio" aria-selected="false" hidden>Audio</button>
+      <span class="sp"></span>
+            <button class="ico" id="liveBtn" aria-label="Connect a YouTube or Twitch stream" title="Connect a stream" aria-haspopup="dialog" aria-controls="liveDialog"><svg class="i"><use href="#live"/></svg></button>
+      <button class="ico" id="dlBtn" aria-label="Download from a link" title="Download from a link"><svg class="i"><use href="#download"/></svg></button>
+      <button class="ico" id="addBtn" aria-label="Add source" title="Add source (video or audio)"><svg class="i"><use href="#plus"/></svg></button><input type="file" id="srcPick" accept="video/*,audio/*,.mp4,.mov,.m4v,.mkv,.webm,.avi,.mp3,.wav,.m4a,.aac,.ogg,.flac,.aiff" multiple hidden>
+    </div>
+    <div class="upstatus" id="upStatus" hidden role="status"><span id="upText"></span><div class="rdbar inline"><i id="upFill"></i></div></div>
+    <div class="dropveil" aria-hidden="true"><b id="dropWhere"></b><span>Release to upload</span></div>
+    <div class="scroll" id="favPanel" hidden>
+      
+      <div class="favbar" id="favBar" hidden><input id="favSearch" type="search" placeholder="Search saved clips" aria-label="Search saved clips"></div>
+      <div class="favlist" id="favList"></div>
+      <p class="hint favcount num" id="favCount"></p>
+    </div>
+    <div class="scroll" id="audioPanel" hidden>
+      <div class="audlist" id="audList"></div>
+    </div>
+    <div class="scroll" id="fxPanel" hidden>
+      <p class="hint fxhint" id="fxHint">Drag an effect onto a clip in the list or on the timeline. Or select a clip and click one.</p>
+      <div class="fxgrid" id="fxGrid"></div>
+    </div>
+    <div class="scroll" id="mediaPanel">
+      <div class="srcs" id="sources">
+      <div id="library"></div>
+      </div>
+      <section class="streamers" id="streamers" aria-label="Streamers">
+        <div class="sthead"><button type="button" class="ti stfold" id="streamerFold" aria-expanded="true" aria-controls="streamerBody" aria-label="Collapse Streamers" title="Collapse"><svg class="i"><use href="#chevdown"/></svg></button><h2>Streamers</h2><span class="num" id="streamerCount"></span><span class="sp"></span><button type="button" class="ti" id="streamerRefresh" aria-label="Check who is live" title="Check who is live"><svg class="i"><use href="#refresh"/></svg></button></div>
+        <div class="stbody" id="streamerBody"><div id="streamerRows"></div>
+        <form class="stadd" id="streamerForm"><svg class="i linkico"><use href="#plus"/></svg><input id="streamerInput" placeholder="YouTube or Twitch channel" aria-label="YouTube or Twitch channel" spellcheck="false" autocomplete="off"><button type="submit" class="ghost" id="streamerAdd" disabled>Add</button></form></div>
+      </section>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <section class="mon srcmon" aria-label="Source monitor">
+      <div class="mon-h"><span id="srcName" hidden>No video selected</span><span class="num" id="srcMeta" hidden></span><button type="button" class="mini" id="liveBack" hidden>Back to stream</button></div>
+      <div class="screen src">
+        <video id="video" playsinline preload="auto"></video>
+        <span class="livebadge" id="liveBadge" hidden><i></i>Live</span>
+        <div class="sub" id="srcSub"></div>
+        <div class="livestage" id="liveStage" hidden></div>
+        <p class="livehint" id="liveHint" hidden></p>
+        <div class="fxlayer" id="fxOverlay"></div>
+        <div class="overlay" id="overlay"><div id="ovText">Preparing preview</div><div class="bar"><i id="ovBar"></i></div></div>
+      </div>
+    </section>
+
+    <div class="theater" id="theater" role="dialog" aria-label="Short preview" hidden>
+      <div class="th-bar" id="thBar">
+        <div class="pick" id="formatSeg" role="group" aria-label="Video size">
+          <button data-format="9:16" title="Vertical, for Shorts">9:16</button>
+          <button data-format="4:5" title="Portrait feed post">4:5</button>
+          <button data-format="1:1" title="Square">1:1</button>
+          <button data-format="16:9" title="Regular widescreen video">16:9</button>
+        </div>
+        <div class="pick" id="templateSeg" role="group" aria-label="Layout">
+          <button data-template="full" title="One clip fills the frame">Full</button>
+          <button data-template="split" title="A clip on top and a clip below">Split</button>
+        </div>
+      </div>
+      <button id="closePreview" class="th-close" aria-label="Close preview" title="Close (Esc)"><svg class="i"><use href="#close"/></svg></button>
+      <div class="th-main">
+        <div class="phone">
+          <div class="card1080" id="card1080">
+            <img id="cAvatar" src="/avatar.png" alt="">
+            <div id="cName"></div>
+            <div id="cHandle"></div>
+            <div id="cHook"></div>
+            <canvas id="mirror" width="480" height="270"></canvas>
+            <div id="cCap"></div>
+            <div id="capSel" hidden><i class="ch nw" data-h="nw"></i><i class="ch ne" data-h="ne"></i><i class="ch sw" data-h="sw"></i><i class="ch se" data-h="se"></i><i class="crot" id="capRot"></i><span id="capRead"></span></div>
+            <div id="cSafe">Platform buttons cover this area</div>
+          </div>
+        </div>
+        <div class="th-ctrl" id="thCtrl">
+          <div class="segs" id="segs" aria-label="Clips in this Short"></div>
+          <div class="th-times num"><span id="thElapsed">0:00</span><span id="thLabel">Clip 1 of 1</span><span id="thTotal">0:00</span></div>
+          <div class="th-row">
+            <div class="th-cluster">
+              <button id="thPrev" class="th-skip" aria-label="Previous clip" title="Previous clip"><svg class="i"><use href="#skipprev"/></svg></button>
+              <button id="thPlay" class="th-play" aria-label="Pause"><svg class="i"><use href="#pause"/></svg></button>
+              <button id="thNext" class="th-skip" aria-label="Next clip" title="Next clip"><svg class="i"><use href="#skipnext"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="right" aria-label="Details">
+    <div class="tabs">
+      <button class="tab" id="tabClip" aria-selected="true">Clips</button>
+      <button class="tab" id="tabDetails" aria-selected="false">Details</button>
+      <button class="tab" id="tabShort" aria-selected="false">Settings</button>
+      <button class="tab" id="tabShorts" aria-selected="false" title="Every Short you have rendered, and where it is on YouTube">Shorts</button>
+    </div>
+    <div class="insp panel" id="panelClip">
+      <div class="cliphead phead"><h2>Clips <span class="num" id="lhTotal">0</span></h2></div>
+      <div class="cutlist" id="liveCaps" hidden aria-label="Clips being cut"></div>
+      <div class="dsearch"><svg class="i"><use href="#search"/></svg><input id="dq" type="search" placeholder="Search what they say" aria-label="Search the subtitles of every video" autocomplete="off" spellcheck="false"><button class="ico" id="dclear" hidden aria-label="Clear search" title="Clear"><svg class="i"><use href="#close"/></svg></button></div>
+      <div class="dlisten" id="dlisten" hidden aria-live="polite"></div>
+      <div class="suggest" id="dresults" hidden aria-label="Lines found" aria-live="polite"></div>
+      <div class="suggest" id="suggest" hidden aria-label="Suggested clips"></div>
+      <div class="tray" id="tray"></div>
+    </div>
+    <div class="insp panel" id="panelDetails" hidden></div>
+    <div class="insp panel" id="panelShorts" hidden aria-label="Shorts">
+      <div class="cliphead"><button class="ico" id="shortsBack" aria-label="Back to clips" title="Back to clips"><svg class="i"><use href="#back"/></svg></button><b>Rendered Shorts</b><span class="num" id="shortsCount"></span></div>
+      <p class="shortsnote" id="shortsNote" hidden></p>
+      <div class="shortslist" id="shortsList"></div>
+    </div>
+    <div class="insp panel" id="panelShort" hidden aria-label="Settings">
+      <div class="field"><span>Caption size</span>
+        <div class="sizerow"><input type="range" id="capSizeInput" min="30" max="120" step="2" aria-label="Caption size"><output class="num" id="capSizeOut"></output></div>
+      </div>
+      <label class="check"><input type="checkbox" id="normInput"> Match loudness across clips</label>
+      <label class="check"><input type="checkbox" id="wmInput"> Watermark <span class="wmHandle"></span> over the clips</label>
+      <label class="check"><input type="checkbox" id="blurInput"> Blurred background around the clip</label>
+      <p class="hint">Captions are typed on each clip. Subtitles from the video are added when I render a one-video Short.</p>
+    </div>
+  </aside>
+  <nav class="rail" id="rail" aria-label="Short tools">
+    <button class="rb" data-panel="clips" aria-pressed="false" aria-expanded="false" data-tip="Clips"><svg class="i"><use href="#i-clips"/></svg>Clips</button>
+    <button class="rb" data-panel="transitions" aria-pressed="false" aria-expanded="false" data-tip="Transitions"><svg class="i"><use href="#i-trans"/></svg>Transitions</button>
+    <button class="rb" data-panel="text" aria-pressed="false" aria-expanded="false" data-tip="Caption styles"><svg class="i"><use href="#i-text"/></svg>Text</button>
+    <button class="rb" data-panel="broll" aria-pressed="false" aria-expanded="false" data-tip="B-roll"><svg class="i"><use href="#i-broll"/></svg>B-roll</button>
+    <button class="rb" data-panel="music" aria-pressed="false" aria-expanded="false" data-tip="Music"><svg class="i"><use href="#i-music"/></svg>Music</button>
+    <button class="rb" data-panel="look" aria-pressed="false" aria-expanded="false" data-tip="Settings"><svg class="i"><use href="#i-look"/></svg>Look</button>
+    <span class="sp"></span>
+    <button class="rb shbtn" id="railShorts" aria-label="Your Shorts" data-tip="Your Shorts"><svg class="i"><use href="#c-shorts"/></svg>Shorts<span class="badge" id="railBadge" hidden></span></button>
+  </nav>
+  <div class="railpop" id="railPop" hidden>
+    <section data-panel="clips" aria-label="Clips" hidden>
+      <div class="ph"><h2>Clips</h2><span class="sp"></span><span class="count num" id="bankCount"></span><button class="ico" data-close aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+      <div class="rows" id="bankRows"></div>
+    </section>
+    <section data-panel="transitions" aria-label="Transitions" hidden>
+      <div class="ph"><h2>Transitions</h2><span class="sp"></span><button class="ico" data-close aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+      <p class="hint note" id="trNote"></p>
+      <div class="trlen" id="trLen"></div>
+      <div class="tgrid" id="trGrid"></div>
+    </section>
+    <section data-panel="text" aria-label="Text" hidden>
+      <div class="ph"><h2>Text</h2><span class="sp"></span><button class="ico" data-close aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+      <p class="hint note" id="textNote"></p>
+      <div class="tgrid" id="textGrid"></div>
+      <div class="caption-options">
+        <div class="hirow" id="textMode"></div>
+        <label class="caption-switch" id="textModeAll" title="Set the same caption mode on every captioned clip in the top lane"><span>Apply mode to all captions</span><input type="checkbox" role="switch" id="textModeAllBox" checked></label>
+        <div class="hirow" id="textHi" role="group" aria-label="Colour of the word being said"></div>
+        <label class="caption-switch" id="textSame" title="Every caption sits where the first caption sits"><span>Match caption positions</span><input type="checkbox" role="switch" id="textSameBox"></label>
+      </div>
+    </section>
+    <section data-panel="look" aria-label="Look" hidden>
+      <div class="ph"><h2>Look</h2><span class="sp"></span><button class="ico" data-close aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+      <p class="hint note">Applies to the whole Short.</p>
+      <h3 class="grp">Preset</h3>
+      <div class="short-presets"><select id="shortPresetList" aria-label="Saved Short preset"></select><button class="ico" id="shortPresetNew" aria-label="Save preset" title="Save current look"><svg class="i" aria-hidden="true"><use href="#plus"/></svg></button></div>
+      <h3 class="grp">Picture</h3>
+      <label class="set"><span><b>Blurred background</b><small>Fills the bars around the clip with its own colours.</small></span><input type="checkbox" id="lookBlur" class="tg"></label>
+      <label class="set"><span><b>Watermark</b><small><span class="wmHandle"></span> sits over the clips.</small></span><input type="checkbox" id="lookWm" class="tg"></label>
+      <h3 class="grp">Sound</h3>
+      <label class="set"><span><b>Match loudness</b><small>Keeps loud and quiet clips at one level.</small></span><input type="checkbox" id="lookNorm" class="tg"></label>
+      <h3 class="grp">Workspace</h3>
+      <label class="set"><span><b>Live captions</b><small>Shows the playing caption beside the preview. Edit it there.</small></span><input type="checkbox" id="lookLive" class="tg"></label>
+      <div class="livecap-size" id="liveCapSizeRow"><label for="liveCapSize">Font size</label><input type="number" id="liveCapSize" min="12" max="26" step="1" value="17" aria-label="Live captions font size"></div>
+    </section>
+    <section data-panel="broll" aria-label="B-roll" hidden>
+      <div class="ph"><h2>B-roll</h2><span class="sp"></span><button class="ico" id="brollAdd" aria-label="Add B-roll videos" title="Add B-roll videos"><svg class="i"><use href="#plus"/></svg></button><input type="file" id="brollPick" accept="video/*,.mp4,.mov,.m4v,.mkv,.webm,.avi" multiple hidden><button class="ico" data-close aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+      <p class="hint note" id="brollNote">Videos you add here go on the other lanes. Adding one opens a second lane when there is only one.</p>
+      <div class="rows" id="brollRows"></div>
+    </section>
+    <section data-panel="music" aria-label="Music" hidden>
+      <div class="ph"><h2>Music</h2><span class="sp"></span><button class="ico" id="musicFind" aria-label="Browse sounds online" title="Browse sounds online"><svg class="i"><use href="#globe"/></svg></button><button class="ico" id="musicAdd" aria-label="Add audio files" title="Add audio files"><svg class="i"><use href="#plus"/></svg></button><button class="ico" data-close aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+      <div id="musicList"></div>
+    </section>
+  </div>
+  <aside class="livecap" id="liveCap" aria-label="Live captions" hidden>
+    <div class="lchead"><small class="num" id="lcMeta"></small><small class="num" id="lcCount" hidden></small><button type="button" class="lcedit" id="lcEdit">Edit</button></div>
+    <div class="lcscroll" id="lcScroll" tabindex="0" role="button" aria-label="Caption for the playing clip. Press Enter to edit."><div class="lcflow" id="lcFlow"></div></div>
+    <button type="button" id="lcClip" aria-label="Create clip" title="Create clip" hidden><svg class="i" aria-hidden="true"><use href="#c-scissors"/></svg></button>
+    <textarea id="lcText" spellcheck="true" placeholder="No caption on this clip. Type one here." aria-label="Caption for the playing clip" hidden></textarea>
+  </aside>
+</div>
+
+<div class="bottom">
+<div class="cstrip" id="cstrip" role="toolbar" aria-label="Source controls">
+  <div class="sl">
+    <button class="ti" id="markIn" aria-label="Mark in" title="Mark in (I)"><svg class="i"><use href="#in"/></svg></button>
+    <button class="ti" id="markOut" aria-label="Mark out" title="Mark out (O)"><svg class="i"><use href="#out"/></svg></button>
+    <button class="ti clipit" id="clipIt" aria-label="Clip the marked part" title="Mark in and out first" disabled><svg class="i"><use href="#c-scissors"/></svg></button>
+    <span class="div"></span>
+    <button class="ti" id="splitBtn" aria-label="Split at the playhead" title="Split at the playhead (S)"><svg class="i"><use href="#c-split"/></svg></button>
+    <button class="ti" id="delBtn" aria-label="Delete the clip under the playhead" title="Delete the clip under the playhead (Delete)"><svg class="i"><use href="#trash"/></svg></button>
+    <button class="ti" id="muteBtn" aria-label="Mute the clip" title="Mute the clip (M)"><svg class="i"><use href="#c-vol"/></svg></button>
+    <button class="ti" id="suggestBtn" aria-label="Suggest clips" title="Suggest clips: find the moments in this video worth cutting"><svg class="i"><use href="#r-fx"/></svg></button>
+    <button class="ti" id="draftBtn" aria-label="Draft Shorts" title="Draft Shorts: make three Shorts from the best moments of this video as new projects, each laid out, captioned and trimmed to length"><svg class="i"><use href="#c-shorts"/></svg></button>
+    <span class="div"></span>
+    <span class="histslot" id="histClip"><button class="ti hist" id="undoBtn" aria-label="Undo" title="Undo (Cmd Z)" disabled><svg class="i"><use href="#undo"/></svg></button><button class="ti hist" id="redoBtn" aria-label="Redo" title="Redo (Cmd Shift Z)" disabled><svg class="i"><use href="#redo"/></svg></button></span>
+  </div>
+  <div class="sc">
+    <button class="ti" id="prevBtn" aria-label="Previous scene cut" title="Previous scene cut (Shift Tab)"><svg class="i"><use href="#c-prev"/></svg></button>
+    <button class="ti big" id="playBtn" aria-label="Play" title="Play (Space)"><svg class="i"><use href="#c-play"/></svg></button>
+    <button class="ti" id="nextBtn" aria-label="Next scene cut" title="Next scene cut (Tab)"><svg class="i"><use href="#c-next"/></svg></button>
+    <span class="tc num" id="tc"><b id="tcNow">0:00.00</b><i>/</i><span id="tcTot">0:00.00</span></span>
+  </div>
+  <div class="sr"><span class="anchor"><button class="ti" id="helpBtn" aria-label="Keyboard shortcuts" aria-expanded="false" aria-haspopup="dialog" title="Keyboard shortcuts"><svg class="i"><use href="#c-help"/></svg></button></span></div>
+</div>
+<div class="cstrip" id="liveStrip" role="toolbar" aria-label="Stream controls">
+  <div class="sl">
+    <button class="ti" id="liveIn" aria-label="Mark in" title="Mark in (I)"><svg class="i"><use href="#in"/></svg></button>
+    <button class="ti" id="liveOut" aria-label="Mark out" title="Mark out (O)"><svg class="i"><use href="#out"/></svg></button>
+    <button class="ti clipit" id="liveClip" aria-label="Clip the selection" title="Clip the selection (Enter)" disabled><svg class="i"><use href="#c-scissors"/></svg><span class="cnt" id="liveCnt" hidden></span></button>
+    <span class="div"></span>
+    <span class="quick" id="liveQuick" role="group" aria-label="Clip what just played"><span class="ql">Last</span><button data-secs="15">15s</button><button data-secs="30">30s</button><button data-secs="45">45s</button></span>
+  </div>
+  <div class="sc">
+    <button class="ti" id="liveBack5" aria-label="Back 5 seconds" title="Back 5 seconds (J)"><svg class="i"><use href="#back"/></svg></button>
+    <button class="ti big" id="livePlay" aria-label="Play" title="Play (Space)"><svg class="i"><use href="#c-pause"/></svg></button>
+    <button class="ti" id="liveFwd5" aria-label="Forward 5 seconds" title="Forward 5 seconds (L)"><svg class="i"><use href="#fwd"/></svg></button>
+    <span class="tc num" id="liveTc"></span>
+  </div>
+  <div class="sr"><span class="selnote num" id="bufSel"></span><button class="ghost jump" id="liveJump" hidden>Jump to live</button><span class="anchor"><button class="ti" id="helpBtn3" aria-label="Keyboard shortcuts" aria-expanded="false" aria-haspopup="dialog" title="Keyboard shortcuts"><svg class="i"><use href="#c-help"/></svg></button></span></div>
+</div>
+<section class="timeline" id="fileTl" aria-label="Source timeline">
+  <i class="ph-ruler" id="phRuler" hidden></i>
+  <div class="ruler num" id="ruler"></div>
+  <div class="lane"><div class="strip empty" id="strip"></div><div class="nav" id="nav" hidden><i id="navThumb"></i></div></div>
+  <div class="foot num"><span id="total">0.0s</span><span id="verdict" class="bad">Under 30s</span></div>
+</section>
+
+<section class="timeline shorttl" id="shortTl" aria-label="Short timeline" hidden>
+  <div class="cstrip" id="shortStrip" role="toolbar" aria-label="Preview controls">
+    <div class="sl">
+      <button class="ti" id="sSplit" aria-label="Split at the playhead" title="Split at the playhead (S)"><svg class="i"><use href="#c-split"/></svg></button>
+      <button class="ti" id="sTrash" aria-label="Remove the selected clip" title="Remove the selected clip (Delete)"><svg class="i"><use href="#trash"/></svg></button>
+      <button class="ti" id="thMute" aria-label="Mute the preview" aria-pressed="false" title="Mute the preview"><svg class="i"><use href="#c-vol"/></svg></button>
+      <span class="div"></span>
+      <span class="histslot" id="histShort"></span>
+      <span class="div"></span>
+      <span class="zctl" role="group" aria-label="Timeline zoom">
+        <button type="button" class="zb" id="tlZoomOut" aria-label="Zoom out" title="Zoom out (-)"><svg viewBox="0 0 16 16"><path d="M3.5 8h9"/></svg></button>
+        <input type="range" id="tlZoomRange" min="0" max="100" value="0" aria-label="Timeline zoom" title="Zoom (Ctrl and scroll, = and -)">
+        <button type="button" class="zb" id="tlZoomIn" aria-label="Zoom in" title="Zoom in (=)"><svg viewBox="0 0 16 16"><path d="M3.5 8h9M8 3.5v9"/></svg></button>
+      </span>
+    </div>
+    <div class="sc" id="sMid"><span class="tc num" id="sTime"></span></div>
+    <div class="sr">
+      <span id="stlHint" hidden></span><button id="clipPrevBtn" hidden>Render clip</button>
+      <button id="renderBtn" title="Render this Short in the background"><svg class="i"><use href="#i-send"/></svg><span>Push to render</span></button>
+      <span class="anchor"><button class="ti" id="helpBtn2" aria-label="Keyboard shortcuts" aria-expanded="false" aria-haspopup="dialog" title="Keyboard shortcuts"><svg class="i"><use href="#c-help"/></svg></button></span>
+    </div>
+  </div>
+  <div class="stl-main"><div id="stlHeads"></div><div class="stl-body" id="stlBody"></div></div>
+</section>
+
+<section class="timeline buftl" id="bufTl" aria-label="Stream buffer">
+  <div hidden><span id="bufHint"></span><span id="bufLen"></span></div>
+  <div class="buf-tools" id="bufZoom" role="group" aria-label="Live timeline window">
+    <span>View</span><button type="button" data-window="60" aria-pressed="false">1 min</button><button type="button" data-window="300" aria-pressed="false">5 min</button><button type="button" data-window="900" aria-pressed="true">15 min</button><button type="button" data-window="3600" aria-pressed="false">60 min</button><button type="button" data-window="0" aria-pressed="false">All</button>
+    <button type="button" id="liveMoment" class="buf-moment" title="Bookmark this moment (Shift+M)">Mark moment</button><span id="momentStatus" class="num"></span>
+    <span class="buf-legend"><i></i>Available footage</span>
+  </div>
+    <div class="buf-track" id="bufTrack" role="group" aria-label="Stream buffer. Click to move the playhead, drag the handles to adjust a clip">
+    <div class="buf-available" id="bufAvailable" hidden></div>
+    <div class="buf-made" id="bufMade"></div>
+    <div id="bufRanges"></div><div id="liveMoments"></div>
+    <i class="buf-mark" id="bufMark" hidden></i>
+    <i class="buf-head-line" id="bufPlay"></i>
+    <i class="buf-edge" id="bufEdge" hidden></i>
+  </div>
+  <div class="buf-ticks num" id="bufTicks"></div>
+  <i class="ph-ticks" id="bufPlayTail" hidden></i>
+</section>
+  <dialog class="keys" id="keysShort" aria-labelledby="keysShortTitle"><div class="keys-head"><div><h3 id="keysShortTitle">Keyboard shortcuts</h3><span>Short</span></div><button type="button" class="ico keys-close" aria-label="Close keyboard shortcuts"><svg class="i"><use href="#close"/></svg></button></div><div class="kgrid"><div class="kr"><span>Play or pause</span><span class="kk"><kbd>Space</kbd></span></div><div class="kr"><span>Previous clip</span><span class="kk"><kbd>←</kbd></span></div><div class="kr"><span>Next clip</span><span class="kk"><kbd>→</kbd></span></div><div class="kr"><span>Split at the playhead</span><span class="kk"><kbd>S</kbd></span></div><div class="kr"><span>Duplicate the clip</span><span class="kk"><kbd>D</kbd></span></div><div class="kr"><span>Move the clip along its lane</span><span class="kk"><kbd>⌥</kbd><kbd>←</kbd><kbd>→</kbd></span></div><div class="kr"><span>Zoom the timeline</span><span class="kk"><kbd>⌘</kbd><span>scroll</span><kbd>=</kbd><kbd>-</kbd></span></div><div class="kr"><span>Fit all, or fit the selection</span><span class="kk"><kbd>0</kbd><kbd>\</kbd></span></div><div class="kr"><span>Snapping on or off</span><span class="kk"><kbd>N</kbd></span></div><div class="kr"><span>Add a marker</span><span class="kk"><kbd>⇧</kbd><kbd>M</kbd></span></div><div class="kr"><span>Play backward, stop, play forward (again for faster)</span><span class="kk"><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd></span></div><div class="kr"><span>Jump 2s back or forward</span><span class="kk"><kbd>⇧</kbd><kbd>J</kbd><kbd>L</kbd></span></div><div class="kr"><span>Previous or next cut</span><span class="kk"><kbd>[</kbd><kbd>]</kbd></span></div><div class="kr"><span>Start or end</span><span class="kk"><kbd>Home</kbd><kbd>End</kbd></span></div><div class="kr"><span>Select several clips</span><span class="kk"><kbd>⇧</kbd><kbd>⌘</kbd><span>click</span></span></div><div class="kr"><span>Select all clips</span><span class="kk"><kbd>⌘</kbd><kbd>A</kbd></span></div><div class="kr"><span>Copy and paste clips</span><span class="kk"><kbd>⌘</kbd><kbd>C</kbd><kbd>V</kbd></span></div><div class="kr"><span>Razor: cut where you click</span><span class="kk"><kbd>C</kbd></span></div><div class="kr"><span>Slip the picture inside a clip</span><span class="kk"><kbd>⌥</kbd><span>drag</span></span></div><div class="kr"><span>Roll the cut with a neighbour</span><span class="kk"><kbd>⇧</kbd><span>drag an end</span></span></div><div class="kr"><span>Select the lane above or below</span><span class="kk"><kbd>↑</kbd><kbd>↓</kbd></span></div><div class="kr"><span>Remove the clip</span><span class="kk"><kbd>⌫</kbd></span></div><div class="kr"><span>Mute the preview</span><span class="kk"><kbd>M</kbd></span></div><div class="kr"><span>Undo</span><span class="kk"><kbd>⌘</kbd><kbd>Z</kbd></span></div><div class="kr"><span>Redo</span><span class="kk"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd></span></div></div></dialog>
+  <dialog class="keys" id="keysPop" aria-labelledby="keysPopTitle"><div class="keys-head"><div><h3 id="keysPopTitle">Keyboard shortcuts</h3><span>Clips</span></div><button type="button" class="ico keys-close" aria-label="Close keyboard shortcuts"><svg class="i"><use href="#close"/></svg></button></div><div class="kgrid"><div class="kr"><span>Mark in</span><span class="kk"><kbd>I</kbd></span></div><div class="kr"><span>Mark out</span><span class="kk"><kbd>O</kbd></span></div><div class="kr"><span>Clip the marked part</span><span class="kk"><kbd>Enter</kbd></span></div><div class="kr"><span>Split at the playhead</span><span class="kk"><kbd>S</kbd></span></div><div class="kr"><span>Duplicate the clip</span><span class="kk"><kbd>D</kbd></span></div><div class="kr"><span>Trim the start or end</span><span class="kk"><kbd>[</kbd><kbd>]</kbd></span></div><div class="kr"><span>Next scene cut</span><span class="kk"><kbd>Tab</kbd></span></div><div class="kr"><span>Step a frame</span><span class="kk"><kbd>←</kbd><kbd>→</kbd></span></div><div class="kr"><span>Play or pause</span><span class="kk"><kbd>Space</kbd></span></div><div class="kr"><span>Mute</span><span class="kk"><kbd>M</kbd></span></div><div class="kr"><span>Undo</span><span class="kk"><kbd>⌘</kbd><kbd>Z</kbd></span></div><div class="kr"><span>Redo</span><span class="kk"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd></span></div></div></dialog>
+</div>
+
+<dialog id="projDlg" class="railpanel" aria-labelledby="pTitle">
+  <div class="fh">
+    <h2 id="pTitle">Projects</h2>
+    <button class="ico" id="pNew" aria-label="New project" title="New project">New project</button>
+    <button class="ico" id="pSearchBtn" aria-label="Search projects" title="Search projects"><svg class="i"><use href="#search"/></svg></button>
+    <button class="ico" id="pPickerClose" aria-label="Close projects" title="Close projects"><svg class="i"><use href="#close"/></svg></button>
+  </div>
+  <div class="project-fields">
+    <label class="psearch" id="pSearchBox" hidden><svg class="i"><use href="#search"/></svg><input id="pSearch" type="search" placeholder="Search projects" aria-label="Search projects" autocomplete="off"><button class="ico" id="pSearchX" type="button" aria-label="Close search"><svg class="i"><use href="#close"/></svg></button></label>
+    <div class="pname-form" id="pNameBox" hidden>
+      <label for="pName">Project name</label>
+      <input id="pName" autocomplete="off" spellcheck="false" maxlength="60" placeholder="Name your project" aria-label="Name your project" aria-describedby="pNameHint">
+      <small id="pNameHint" class="phint" role="status"></small>
+      <div class="pname-actions"><button id="pNameCancel" type="button">Cancel</button><button class="pgo" id="pNameGo" type="button">Create</button></div>
+    </div>
+  </div>
+  <div class="pgrid" id="pGrid"></div>
+</dialog>
+<dialog id="pConfirm" role="alertdialog" aria-labelledby="pConfirmTitle" aria-describedby="pConfirmText">
+  <div class="pcbox"><h4 id="pConfirmTitle"></h4><p id="pConfirmText"></p><div class="prow"><button id="pConfirmNo" autofocus>Keep project</button><button class="danger" id="pConfirmGo">Delete project</button></div></div>
+</dialog>
+<dialog id="shortsDlg" class="shdlg" aria-labelledby="shTitle">
+  <div class="sdhead"><h3 id="shTitle">Your Shorts</h3><span class="count num" id="shCount"></span><button class="ico" id="shClose" aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+  <div class="sdlist" id="shList"></div>
+</dialog>
+<dialog id="soundDlg" class="shdlg" aria-labelledby="sbTitle">
+  <div class="sdhead"><h3 id="sbTitle">Find sounds</h3><span class="count num" id="sbCount"></span><button class="ico" id="sbClose" aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+  <form class="sbsearch" id="sbForm" role="search"><svg class="i"><use href="#search"/></svg><input id="sbQuery" type="search" placeholder="Search sounds, like vine boom" autocomplete="off" aria-label="Search sounds"></form>
+  <div class="sdlist" id="sbList"></div>
+</dialog>
+<dialog id="editDlg" class="shdlg" aria-labelledby="edTitleHead">
+  <div class="sdhead"><button class="ico" id="edBack" aria-label="Back to Shorts" title="Back to Shorts"><svg class="i"><use href="#i-chevleft"/></svg></button><h3 id="edTitleHead">Edit Short</h3><span class="count num" id="edName"></span><button class="ico" id="edClose" aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+  <div class="edbody">
+    <label class="edfield"><span>Title <em class="num" id="edCount"></em></span><input id="edTitle" maxlength="100" autocomplete="off" spellcheck="true"></label>
+    <label class="edfield"><span>Description</span><textarea id="edDesc" rows="8" spellcheck="true"></textarea></label>
+  </div>
+</dialog>
+<dialog id="clipPrevDlg" aria-labelledby="cpTitle">
+  <header class="rdhead"><h3 id="cpTitle">Clip preview</h3><button type="button" class="rdx" id="cpX" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12"/></svg></button></header>
+  <div class="rdplayer cpbody">
+    <div class="rdphone">
+      <video id="cpVideo" controls playsinline loop hidden></video>
+      <div class="rdwait" id="cpWait"><b class="num" id="cpPct">0%</b><span id="cpStatus" role="status"></span></div>
+      <div class="rdbar" id="cpBar"><i id="cpFill"></i></div>
+    </div>
+    <p class="hint">Just this clip. Transitions into it and the audio timeline are left out.</p>
+  </div>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+<dialog id="shortPresetDialog" aria-labelledby="shortPresetTitle">
+  <form id="shortPresetForm"><div class="preset-dialog-head"><h3 id="shortPresetTitle">Save preset</h3><button type="button" class="ico" id="shortPresetClose" aria-label="Close save preset"><svg class="i" aria-hidden="true"><use href="#close"/></svg></button></div>
+  <input id="shortPresetName" maxlength="60" placeholder="Preset name" aria-label="Preset name" required>
+  <div class="preset-dialog-actions"><button type="button" id="shortPresetDelete">Delete selected preset</button><button type="submit" id="shortPresetSave">Save</button></div></form>
+</dialog>
+<dialog id="dlDlg">
+  <h3>Download a video</h3>
+  <p class="hint">Paste a link to a video you have the right to use. It is saved in the clips folder and opens here when it finishes.</p>
+  <input id="dlUrl" placeholder="https://" spellcheck="false" aria-label="Video link">
+  <div class="dlbar" id="dlBar" hidden><i id="dlFill"></i></div>
+  <p class="hint" id="dlStatus" role="status"></p>
+  <div class="btnrow"><button class="grow" id="dlGo">Download</button><button class="grow" id="dlClose">Close</button></div>
+</dialog>
+<dialog id="rmDlg" class="rmdlg" aria-labelledby="rmTitle" aria-describedby="rmFacts">
+  <h3 id="rmTitle">Move this video to the Trash?</h3>
+  <div class="rmvideo">
+    <div class="rmthumb"><img id="rmThumb" alt=""></div>
+    <div class="rmwho"><b id="rmName"></b><small class="num" id="rmMeta"></small></div>
+  </div>
+  <ul class="rmfacts" id="rmFacts"></ul>
+  <div class="rmbtns"><button id="rmCancel">Keep video</button><button class="danger" id="rmGo">Move to Trash</button></div>
+</dialog>
+<dialog id="renderDlg" data-stage="render" aria-labelledby="rdTitle">
+  <header class="rdhead">
+    <h3 id="rdTitle">Render Short</h3>
+    <button type="button" class="rdx" id="rdX" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12"/></svg></button>
+  </header>
+  <div class="rdgrid">
+    <div class="rdplayer">
+      <span class="rdpreview-label">Preview</span>
+      <div class="rdphone">
+        <video id="rdVideo" controls playsinline hidden></video>
+        <div class="rdwait" id="rdWait">
+          <b class="num" id="rdPct">0%</b>
+          <span id="rdStatus" role="status"></span>
+        </div>
+        <div class="rdbar" id="rdBar"><i id="rdFill"></i></div>
+      </div>
+      <p class="hint num" id="rdPath"></p>
+    </div>
+    <form class="rdpub" id="rdPub" hidden onsubmit="return false">
+      <h4 class="rdpub-heading">Video details</h4>
+      <div class="rdfield">
+        <div class="rdlabel"><label for="pubTitle">Title</label><span class="num" id="pubCount"></span><button type="button" class="mini" id="copyTitle">Copy</button></div>
+        <input id="pubTitle" spellcheck="true" autocomplete="off" placeholder="Give your Short a title">
+      </div>
+      <div class="rdfield">
+        <div class="rdlabel"><label for="pubDesc">Description</label><button type="button" class="mini" id="copyDesc">Copy</button></div>
+        <textarea id="pubDesc" rows="5" spellcheck="true" placeholder="Add a description"></textarea>
+      </div>
+      <p class="hint" id="pubSaved"></p>
+      <section class="ytbox" id="ytBox" aria-labelledby="ytHead">
+        <h4 id="ytHead"><svg class="i" aria-hidden="true"><use href="#play"/></svg>YouTube<span>Private upload</span></h4>
+        <p class="hint" id="ytStatus" role="status"></p>
+        <div class="rdbar inline" id="ytBar" hidden><i id="ytFill"></i></div>
+        <div class="btnrow"><button type="button" class="grow" id="ytAction" hidden></button><button type="button" class="quiet" id="ytDisc" hidden>Disconnect</button></div>
+        <div class="ytdone" id="ytLinks" hidden>
+          <div class="ytok"><span class="ytcheck" aria-hidden="true"></span><div><b id="ytTitleEcho"></b><span id="ytWhen"></span></div></div>
+          <a class="btn export" id="ytStudio" target="_blank" rel="noopener">Open YouTube Studio</a>
+          <ol class="ytsteps" aria-label="What to do next">
+            <li>Check copyright <small>Studio shows the result in a minute or two. If it finds a claim, leave the Short private.</small></li>
+            <li>Make it public <small>In Studio, change Visibility from Private to Public.</small></li>
+          </ol>
+          <div class="ytmore"><a id="ytWatch" target="_blank" rel="noopener">View the Short</a><button type="button" class="link" id="ytAgain">Upload again</button><button type="button" class="link push" id="ytDiscDone">Disconnect</button></div>
+        </div>
+        <details class="ytsetup" id="ytSetup" hidden>
+          <summary>YouTube setup</summary>
+          <p class="hint" id="ytSetupIssue"></p>
+          <ol>
+            <li>In Google Cloud Console, create a project and turn on <b>YouTube Data API v3</b>.</li>
+            <li>Set up the OAuth consent screen as External, add your Google account as a test user, then publish it to production so the sign-in doesn't expire after 7 days. It can stay unverified.</li>
+            <li>Under Credentials, create an <b>OAuth client ID</b> of type <b>Desktop app</b> and download the JSON.</li>
+            <li>Save it as <code>data/youtube_client.json</code> in this app's folder, then reload this page.</li>
+          </ol>
+        </details>
+      </section>
+    </form>
+  </div>
+  <footer class="rdfoot"><button id="rdAgain">Render again</button><span class="sp"></span><button id="rdClose">Close</button></footer>
+</dialog>
+<dialog id="liveDialog" aria-labelledby="liveDialogTitle">
+  <div class="live-dialog-head"><h3 id="liveDialogTitle">Connect a stream</h3><button type="button" id="liveClose" aria-label="Close stream dialog"><svg class="i"><use href="#close"/></svg></button></div>
+  <form class="linkbar" id="liveBar">
+    <svg class="i linkico" aria-hidden="true"><use href="#c-link"/></svg>
+    <input id="liveUrl" placeholder="Paste a YouTube or Twitch link" aria-label="Stream link" spellcheck="false" autocomplete="off" autofocus>
+    <button type="submit" class="ghost" id="liveLoad">Connect</button>
+  </form>
+  <p id="liveDialogStatus" class="hint" role="status" hidden></p>
+  <button type="button" class="quiet" id="liveEnd" hidden>End stream</button>
+</dialog>
+<script src="/grade.js"></script>
+<script src="/app.js"></script>
+<script src="/youtube.js"></script>
+<script src="/shorts.js"></script>
+<script src="/vocals.js"></script>
+<script src="/dropzone.js"></script>
+<script src="/short.js"></script>
+<script src="/blend.js"></script>
+<script src="/timeline.js"></script>
+<script src="/selection.js"></script>
+<script src="/framer.js"></script>
+<script src="/seams.js"></script>
+<script src="/reframe.js"></script>
+<script src="/reframebox.js"></script>
+<script src="/lanes.js"></script>
+<script src="/tlresize.js"></script>
+<script src="/textpanel.js"></script>
+<script src="/clipresize.js"></script>
+<script src="/zoom.js"></script>
+<script src="/snap.js"></script>
+<script src="/shuttle.js"></script>
+<script src="/review.js"></script>
+<script src="/suggest.js"></script>
+<script src="/dialogue.js"></script>
+<script src="/audio.js"></script>
+<script src="/captions.js"></script>
+<script src="/livecap.js"></script>
+<script src="/voice.js"></script>
+<script src="/clippreview.js"></script>
+<script src="/live.js"></script>
+<script src="/streamers.js"></script>
+<script src="/shortcuts.js"></script>
+<script src="/panels.js"></script>
+<script src="/soundbank.js"></script>
+<script src="/rail.js"></script>
+<script src="/tighten.js"></script>
+<script src="/autolayout.js"></script>
+<script src="/drafts.js"></script>
+</body>
+</html>
