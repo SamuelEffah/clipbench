@@ -24,7 +24,7 @@ const makePlayer=()=>{
 const laneVids=[makePlayer(),makePlayer(),makePlayer()],LANES=['top','bottom','left','right'];
 const c={in:0,out:10,volume:.6,speed:1};let hit={clip:c,pos:2,held:false},file={id:'cut',base:0,url:'/cut/cut.mp4'};
 const state={clipStop:null},preview={on:true,elapsed:2},video={paused:true};
-const laneCount=()=>2,laneAt=()=>hit,clipFile=()=>file;
+const laneCount=()=>2,laneAt=()=>hit,clipFile=()=>file,fileLoadedIn=()=>null;
 const volumeOf=c=>c.volume,playVolume=c=>quiet?0:c.volume,speedOf=c=>c.speed;
 const movingLen=c=>c.out-c.in,tnow=el=>el.currentTime+Number(el.dataset.base);
 ''' + setter + sync + r'''

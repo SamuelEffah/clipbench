@@ -221,6 +221,15 @@ function clipFile(c) {
   const v = byPath(c.src);
   return v && v.ready ? {id: v.id, url: `/media/${v.id}`, base: 0} : null;
 }
+// The file a player already holds, when it can show this clip: the clip's own cut, or the source it was cut from. Keeping it
+// means a scrub across a cut, or a clip following one from the same video, needs no load at all.
+function fileLoadedIn(el, c) {
+  if (!el || el.readyState < 1) return null;
+  const cut = cutIds.get(cutKey(c));
+  if (cut && el.dataset.id === `cut:${cut}`) return {id: `cut:${cut}`, url: `/cut/${cut}.mp4`, base: c.in};
+  const v = byPath(c.src);
+  return v && el.dataset.id === v.id ? {id: v.id, url: `/media/${v.id}`, base: 0} : null;
+}
 async function clipFileSoon(c, waitMs = 6000) {
   await Promise.race([requestCut(c), new Promise(r => setTimeout(r, waitMs))]);
   return clipFile(c);
@@ -1629,10 +1638,13 @@ function leaveAt(clip) {
 
 // Play one clip of the Short in the preview players, from its own file when it has one.
 async function previewRange(clip, onDone, guard, from) {
-  // Play from whatever is ready now: the clip's own file when it is saved, else the source. The file is made in the
-  // background for next time; waiting for it froze the playhead for the whole encode after every trim.
-  const file = clipFile(clip) || await clipFileSoon(clip);
+  // Play from whatever is ready now: a player that already holds this clip's file or source, else the clip's own file when
+  // it is saved, else the source. The file is made in the background for next time; waiting for it froze the playhead
+  // for the whole encode after every trim.
+  const other = spare(), held = fileLoadedIn(video, clip) ? video : fileLoadedIn(other, clip) ? other : null;
+  const file = held ? fileLoadedIn(held, clip) : clipFile(clip) || await clipFileSoon(clip);
   if (!file) return toast("Couldn't get that clip ready to play");
+  if (held) requestCut(clip);
   const begin = from === undefined ? clip.in : from;
   const start = skipSeek => {
     if (guard && !guard()) return;
@@ -1651,6 +1663,7 @@ async function previewRange(clip, onDone, guard, from) {
     swapTo(ready);
     return start(true);
   }
+  if (held && held !== video) swapTo(held);
   if (video.dataset.id === file.id && video.readyState >= 1) return start();
   loadFileInto(video, file, () => { if (!guard || guard()) start(); });
 }
@@ -2254,7 +2267,7 @@ function syncLanes() {
 
 function syncLane(el, lane) {
   const hit = laneAt(lane, preview.elapsed || 0, true);
-  const file = hit && clipFile(hit.clip);
+  const file = hit && (fileLoadedIn(el, hit.clip) || clipFile(hit.clip));
   if (!file) { if (!el.paused) el.pause(); return null; }
   const c = hit.clip;
   if (el.dataset.id !== file.id) {

@@ -30,12 +30,15 @@ const cutKey = c => `${c.src}|${c.in.toFixed(3)}|${c.out.toFixed(3)}`;
 let cutResolve;
 const requestCut = () => { events.push('requestCut'); return new Promise(r => { cutResolve = r; }); };
 const byPath = () => library;
-const spare = () => ({dataset: {}, readyState: 0});
+let spareEl = {dataset: {}, readyState: 0};
+const spare = () => spareEl;
 const speedAt = () => 1, volumeOf = () => 1, playVolume = () => 1, leaveAt = c => c.out, baseOf = el => Number(el.dataset.base) || 0;
-const playTransition = () => {}, toast = m => events.push('toast:' + m), swapTo = () => {};
+const playTransition = () => {}, toast = m => events.push('toast:' + m);
 const loadFileInto = (el, file, then) => { events.push('load:' + file.url); el.dataset.id = file.id; el.dataset.base = file.base; el.readyState = 1; el.onready = then; };
-const video = {dataset: {id: '', base: '0'}, readyState: 1, paused: true, currentTime: 0,
-  play() { events.push('play@' + this.currentTime); this.paused = false; return Promise.resolve(); }, pause() { this.paused = true; }};
+const player = id => ({dataset: {id, base: '0'}, readyState: 1, paused: true, currentTime: 0,
+  play() { events.push('play@' + this.currentTime); this.paused = false; return Promise.resolve(); }, pause() { this.paused = true; }});
+let video = player('');
+const swapTo = el => { events.push('swap'); video = el; };
 '''
 
 
@@ -68,6 +71,55 @@ class PreviewStartsNowTests(unittest.TestCase):
   video.onready();
   assert.deepEqual(events.slice(1), ['play@0'], 'a cut file starts at its own beginning');
 })().catch(e => { console.error(e); process.exitCode = 1; });
+''')
+
+    def test_a_player_already_on_the_clips_source_keeps_it_rather_than_loading_the_cut(self):
+        # Scrubbing across a cut must not swap files on every crossing; what is loaded and can show the clip is used.
+        self.run_node(STUBS + "let library = {id: 'v1', ready: true};\n" + preview_range_code() + r'''
+(async () => {
+  const clip = {src: '/w/a.mp4', in: 12, out: 20};
+  cutIds.set(cutKey(clip), 'c1');
+  video = player('v1');
+  await previewRange(clip, () => {}, () => true, 14);
+  assert.deepEqual(events, ['requestCut', 'play@14'], 'no load, no swap: the source in the player shows this clip, the cut is only warmed');
+})().catch(e => { console.error(e); process.exitCode = 1; });
+''')
+
+    def test_the_spare_player_holding_the_clips_file_is_shown_instead_of_loading_it_again(self):
+        self.run_node(STUBS + "let library = {id: 'v1', ready: true};\n" + preview_range_code() + r'''
+(async () => {
+  const clip = {src: '/w/a.mp4', in: 12, out: 20};
+  cutIds.set(cutKey(clip), 'c1');
+  video = player('v2');
+  spareEl = player('cut:c1');
+  spareEl.dataset.base = '12';
+  await previewRange(clip, () => {}, () => true, 14);
+  assert.deepEqual(events, ['requestCut', 'swap', 'play@2'], 'the spare takes over at the right moment of the cut file');
+})().catch(e => { console.error(e); process.exitCode = 1; });
+''')
+
+    def test_a_lane_player_on_the_clips_source_is_not_reloaded_for_its_cut(self):
+        source = APP.read_text()
+        code = slice_of(source, "function fileLoadedIn(", "\nasync function clipFileSoon") + "\n" + slice_of(source, "function syncLane(", "\n// Where each lane sits")
+        self.run_node(r'''
+const assert = require('node:assert/strict');
+const clip = {src: '/w/a.mp4', in: 12, out: 20, lane: 'bottom'};
+const state = {clipStop: null, project: {clips: [clip]}};
+const preview = {elapsed: 3};
+const previewMuted = false;
+const cutIds = new Map([['/w/a.mp4|12.000|20.000', 'c1']]);
+const cutKey = c => `${c.src}|${c.in.toFixed(3)}|${c.out.toFixed(3)}`;
+const byPath = () => ({id: 'v1', ready: true});
+const laneAt = () => ({clip, pos: 3, held: false});
+const clipFile = () => ({id: 'cut:c1', url: '/cut/c1.mp4', base: 12});
+const volumeOf = () => 1, playVolume = () => 1, speedOf = () => 1, movingLen = c => c.out - c.in, baseOf = el => Number(el.dataset.base) || 0;
+const tnow = el => el.currentTime + baseOf(el);
+const setPlaybackValue = (t, k, v) => { if (t[k] !== v) t[k] = v; };
+const video = {paused: false};
+const el = {dataset: {id: 'v1', base: '0'}, readyState: 2, paused: true, currentTime: 15, set src(v) { throw new Error('reloaded ' + v); }, play() { this.paused = false; return Promise.resolve(); }, pause() { this.paused = true; }};
+''' + code + r'''
+syncLane(el, 'bottom');
+assert.equal(el.paused, false, 'the lane keeps playing from the source it already has');
 ''')
 
     def test_with_nothing_playable_it_waits_for_the_cut(self):
