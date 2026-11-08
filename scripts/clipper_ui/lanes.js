@@ -86,6 +86,7 @@ function setLaneFlag(key, lane, on) {
   else delete next[lane];
   state.project = {...state.project, [key]: next};
   changed(true, `${key}:${lane}`);
+  renderShortTl();
 }
 
 // Make the sound that is already playing follow a mute or solo change.
