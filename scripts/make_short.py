@@ -963,6 +963,20 @@ def montage_context(cuts, sources, options, frame, audio_track, normalize, fade_
             "audio_presence": {}, "loudness": {}, "effects": {}}
 
 
+def matte_lines(i, vin, retime, width, height, opt):
+    """A clip zoomed out in a filled frame, set over a blurred copy of itself instead of black margins, placed by zx and zy
+    the way the editor's preview places it. Returns the filter lines, ending at [mf{i}]."""
+    cover = f"max({width}/iw,{height}/ih)*{opt['zoom']:.4f}"
+    soft = (f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},"
+            f"scale={width // BLUR_BG_SHRINK}:{height // BLUR_BG_SHRINK}:flags=area,scale={width}:{height}:flags=bicubic,gblur=sigma=40,"
+            f"eq=contrast=0.7:brightness={BLUR_BG_DIM}:saturation=1.1,setsar=1")
+    place = (f"x='if(lte(w,W),(W-w)*{opt['zx']:.3f},(W-w)*{opt['pan']:.3f})':y='if(lte(h,H),(H-h)*{opt['zy']:.3f},(H-h)*{opt['pan']:.3f})'")
+    return [f"{vin}{retime},split=2[bg{i}][fg{i}]",
+            f"[bg{i}]{soft}[bgb{i}]",
+            f"[fg{i}]scale='trunc(iw*{cover}/2)*2':'trunc(ih*{cover}/2)*2',setsar=1[fgs{i}]",
+            f"[bgb{i}][fgs{i}]overlay={place}:shortest=1,setsar=1[mf{i}]"]
+
+
 def clip_video_chain(i, cut, opt, ctx):
     """The filter line(s) that turn input i into the clip's picture [v{i}]."""
     start, end = cut[0], cut[1]
@@ -987,6 +1001,9 @@ def clip_video_chain(i, cut, opt, ctx):
     else:
         vin = f"[{i}:v]"
         retime = f"setpts=(PTS-STARTPTS)/{speed:.4f}" if speed != 1 else "setpts=PTS-STARTPTS"
+    if framed and opt.get("matte") and opt["fit"] == "fill" and opt["zoom"] < 1.0:
+        lines.extend(matte_lines(i, vin, retime, width, height, opt))
+        vin, retime, fit = f"[mf{i}]", "null", ""
     track = tracking.to_output_time(opt["track"], start, pieces) if opt["track"] else None
     fit += zoom_filter(width, height, opt, track) if framed else ""
     steady = ",fps=30" if ctx["mixed"] or ramped or hold or speed != 1 or opt["effect"] != "none" or ctx["has_overlaps"] else ""
@@ -1435,7 +1452,7 @@ def main():
         sys.exit(f"--subs follows one video's timing, so it can't be used with --template {a.template}")
     cuts, options = (top_cuts, top_opts) if cuts else (cuts, options)
     if a.template in ("fill", "fit"):
-        options = [{**o, "fit": a.template} for o in options]
+        options = [{**o, "fit": a.template, "matte": a.blur_bg and a.template == "fill"} for o in options]
     captions = [o["caption"] or o["words"] for o in options]
     if any(captions) and a.subs:
         sys.exit("the cut list has captions and --subs is set, and both sit on the clip; use one")
@@ -1504,7 +1521,7 @@ def main():
             if a.blur_bg:
                 ox = oy = 0
                 pw, ph = cw, ch
-                if cuts:
+                if cuts and a.template != "fill":
                     sw, sh = probe_size(cuts[0][2] or a.clip)
                     k = min(cw / sw, ch / sh)
                     pw, ph = int(sw * k) // 2 * 2, int(sh * k) // 2 * 2
