@@ -24,11 +24,6 @@ const fmt = t => {
   const s = Math.max(0, t || 0), m = Math.floor(s / 60);
   return `${m}:${(s - m * 60).toFixed(2).padStart(5, "0")}`;
 };
-const parseTime = text => {
-  const parts = String(text).trim().split(":").map(Number);
-  if (!parts.length || parts.length > 3 || parts.some(n => Number.isNaN(n) || n < 0)) return null;
-  return parts.reduce((acc, n) => acc * 60 + n, 0);
-};
 const speedOf = c => c.speed || 1;
 const volumeOf = c => (c.volume === undefined ? 1 : c.volume);
 // Speed ramps as (from, to, relative speed) over the clip's source time. Keep in step with RAMPS in make_short.py.
@@ -258,12 +253,12 @@ function recordEdit(key) {
 function changed(keepDom, key = "") {
   recordEdit(key);
   editCount++;
-  if (typeof scheduleRetime === "function") scheduleRetime();
   unsaved = true;
   $("saved").textContent = "Saving";
   clearTimeout(saveTimer);
   saveTimer = setTimeout(save, 500);
   if (!keepDom) render();
+  if (typeof scheduleRetime === "function") scheduleRetime();
 }
 
 function travel(from, to, label) {
@@ -1612,24 +1607,6 @@ function adopt(el, v) {
 }
 
 let preloadToken = 0;
-function preloadClip(clip) {
-  const v = byPath(clip.src), el = spare();
-  if (!v || !v.ready) return;
-  const token = ++preloadToken;
-  el.pause();
-  const seek = () => {
-    if (token !== preloadToken) return;
-    el.dataset.pre = `${v.id}@${clip.in}`;
-    el.currentTime = clip.in;
-  };
-  el.dataset.pre = "";
-  if (el.dataset.id === v.id && el.readyState >= 1) return seek();
-  el.dataset.id = v.id;
-  el.dataset.base = "0";
-  el.addEventListener("loadedmetadata", seek, {once: true});
-  el.src = `/media/${v.id}`;
-}
-
 const FRAMES = {wide: [1920, 1080], square: [1080, 1080], tall: [1080, 1350]};
 // Glitch bursts follow the same hash as glitch_burst in make_short.py, so the preview tears where the render does.
 const GLITCH_SLOT = 0.08, GLITCH_ODDS = 0.22;
@@ -1652,28 +1629,6 @@ function effectPose(clip, vid = video) {
   else if (id === "zoom_out") pose.zoom = 1.15 - 0.15 * t / len;
   else if (id === "punch") pose.zoom = 1 + 0.2 * Math.pow(Math.max(0, 1 - t / 0.35), 2);
   else if (id === "shake") Object.assign(pose, {zoom: 1.06, dx: 0.012 * Math.sin(t * 37), dy: 0.008 * Math.sin(t * 41 + 1)});
-// The hook is edited where it is shown: click it in the preview, type, and Enter or a click away keeps it.
-{
-  const el = $("cHook");
-  const commit = () => {
-    const text = el.innerText.replace(/\s+/g, " ").trim();
-    if (text !== (state.project.hook || "")) {
-      state.project = {...state.project, hook: text};
-      changed(true, "hook");
-    }
-    layoutCard();
-  };
-  el.addEventListener("keydown", e => {
-    if (e.key === "Enter") { e.preventDefault(); el.blur(); }
-    else if (e.key === "Escape") { el.textContent = state.project.hook || ""; el.blur(); }
-  });
-  el.addEventListener("paste", e => {
-    e.preventDefault();
-    document.execCommand("insertText", false, e.clipboardData.getData("text/plain").replace(/\s+/g, " "));
-  });
-  el.addEventListener("blur", commit);
-}
-
   else if (id === "flash") pose.flash = Math.max(0, 1 - t / 0.25);
   else if (id === "glitch") pose.glitch = glitchAt(t);
   return pose;
@@ -1786,6 +1741,28 @@ function wrapHook(text, px) {
   }
   if (line) lines.push(line);
   return lines;
+}
+
+// The hook is edited where it is shown: click it in the preview, type, and Enter or a click away keeps it.
+{
+  const el = $("cHook");
+  const commit = () => {
+    const text = el.innerText.replace(/\s+/g, " ").trim();
+    if (text !== (state.project.hook || "")) {
+      state.project = {...state.project, hook: text};
+      changed(true, "hook");
+    }
+    layoutCard();
+  };
+  el.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+    else if (e.key === "Escape") { el.textContent = state.project.hook || ""; el.blur(); }
+  });
+  el.addEventListener("paste", e => {
+    e.preventDefault();
+    document.execCommand("insertText", false, e.clipboardData.getData("text/plain").replace(/\s+/g, " "));
+  });
+  el.addEventListener("blur", commit);
 }
 
 // The 1080-wide card is scaled down to the phone, and --k is how many card pixels one screen pixel covers, so the
@@ -2048,20 +2025,6 @@ function stepPreview(dir) {
   if (next < 0) return startPreviewAt(nextTop(-1));
   if (next >= state.project.clips.length) return;
   startPreviewAt(next);
-}
-
-// Where a top-lane clip starts in the finished Short, once earlier transitions have overlapped the clips.
-function topStart(idx) {
-  let at = 0, prev = null;
-  for (let n = 0; n <= idx; n++) {
-    const c = state.project.clips[n];
-    if (!c || !isTop(c)) continue;
-    at -= seamOverlap(prev, c);
-    if (n === idx) return at;
-    at += outLen(c);
-    prev = c;
-  }
-  return at;
 }
 
 function updatePreview() {
@@ -2672,13 +2635,6 @@ let pNaming = null; // {copy: source or null} while the name field is up
 const PROJECT_NAME = /^[A-Za-z0-9_-]{1,60}$/;
 const projDlg = $("projDlg"), pbox = $("pname");
 
-// What a row says under its name: where its Short stands, or whether it is still a draft.
-function projectStatus(name, info) {
-  const made = (typeof shorts !== "undefined" ? shorts.rows : []).find(s => s.name === name);
-  if (made) return made.upload.state === "done" ? `${made.upload.privacy === "unlisted" ? "Unlisted" : "Private"} on YouTube` : made.upload.state === "uploading" ? "Uploading to YouTube" : "Rendered";
-  return !info ? "" : info.clips ? "Draft" : "No clips yet";
-}
-
 const projectLength = clips => {
   try { return laneTotal("top", clips); } catch { return 0; }
 };
@@ -3192,7 +3148,6 @@ async function loadAssets() {
 }
 
 async function refreshLibrary() {
-    setSideTab("media");
   state.library = await api(`/api/library${projectQuery()}`);
   if (state.current) state.current = state.library.find(v => v.id === state.current.id) || null;
   render();
@@ -3237,6 +3192,7 @@ async function restoreEditorSession() {
     state.project = orient(canon(), mode);
     state.mode = mode;
     resetHistory();
+    setSideTab("media");
   }
   const selected = saved.selected;
   state.sel = selected ? state.project.clips.findIndex((c, i) => i === selected.index && c.src === selected.src && c.in === selected.in && c.out === selected.out) : -1;

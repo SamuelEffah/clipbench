@@ -125,7 +125,6 @@ def audio_type(path):
         head = f.read(12)
     suffix = audio_suffix(head, path.suffix.lower())
     return AUDIO_TYPES.get(suffix, "audio/mpeg")
-NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,60}$")
 
 lock = threading.Lock()
 store = None
@@ -2831,8 +2830,8 @@ class Handler(BaseHTTPRequestHandler):
     "/tighten.js": ("tighten.js", "text/javascript"),
     "/review.js": ("review.js", "text/javascript"),
     "/autolayout.js": ("autolayout.js", "text/javascript"),
-    "/retime.js": ("retime.js", "text/javascript"),
     "/drafts.js": ("drafts.js", "text/javascript"),
+    "/retime.js": ("retime.js", "text/javascript"),
     "/reframebox.js": ("reframebox.js", "text/javascript"),
     "/lanes.js": ("lanes.js", "text/javascript"),
     "/shuttle.js": ("shuttle.js", "text/javascript"),

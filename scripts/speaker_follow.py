@@ -27,10 +27,6 @@ MIN_SPEECH_SHARE = 0.1  # share of the clip someone must be seen speaking for th
 MAX_SPAN = 180.0
 
 
-class NoFaces(ValueError):
-    """No face was found in the clip."""
-
-
 def available():
     return MODEL.is_file()
 

@@ -4,8 +4,6 @@ The work itself (scanning, listening, ranking) is passed in, so this only holds 
 import threading
 from collections import deque
 
-STATES = ("queued", "working", "ready", "error")
-
 
 class Queue:
     def __init__(self, work):

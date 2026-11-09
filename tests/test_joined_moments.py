@@ -62,16 +62,16 @@ class JoinedInThePanel(unittest.TestCase):
         result = subprocess.run(["node", "-e", PRELUDE + "function suggestClip" + source + body], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_adding_a_joined_moment_adds_one_clip_per_piece_in_order(self):
+    def test_a_joined_moment_becomes_one_clip_per_piece_in_order_and_counts_as_added_once_they_are_there(self):
         self.run_js(r'''
-suggestAdd({in: 9.75, out: 82.4, pieces: [[9.75, 26.4], [65.75, 82.4]], length: 33.3});
-assert.deepEqual(state.project.clips.map(c => [c.in, c.out]), [[9.75, 26.4], [65.75, 82.4]]);
-assert.equal(cuts.length, 2); assert.equal(changes, 1);
-assert.ok(suggestAdded({in: 9.75, out: 82.4, pieces: [[9.75, 26.4], [65.75, 82.4]]}));
+const joined = {in: 9.75, out: 82.4, pieces: [[9.75, 26.4], [65.75, 82.4]], length: 33.3};
+const clips = suggestClips(joined);
+assert.deepEqual(clips.map(c => [c.in, c.out]), [[9.75, 26.4], [65.75, 82.4]]);
+assert.equal(suggestClips({in: 100, out: 130}).length, 1);
+assert.ok(!suggestAdded(joined));
+state.project.clips = clips;
+assert.ok(suggestAdded(joined));
 assert.ok(!suggestAdded({in: 9.75, out: 82.4, pieces: [[9.75, 26.4], [90, 100]]}));
-suggestAdd({in: 100, out: 130});
-assert.deepEqual(state.project.clips.map(c => [c.in, c.out]), [[100, 130], [9.75, 26.4], [65.75, 82.4]]);
-assert.ok(suggestAdded({in: 100, out: 130}));
 ''')
 
 

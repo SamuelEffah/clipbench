@@ -9,17 +9,6 @@ function suggestClip(s, v = state.current) {
 const suggestPieces = s => s.pieces || [[s.in, s.out]];
 const suggestClips = (s, v = state.current) => suggestPieces(s).map(([a, b]) => suggestClip({in: a, out: b}, v));
 
-function suggestAdd(s) {
-  const clips = suggestClips(s);
-  state.project = {...state.project, clips: [...clips, ...state.project.clips]};
-  clips.forEach(requestCut);
-  state.sel = 0;
-  state.arrived = 0;
-  changed();
-  state.arrived = -1;
-  paintSuggest();
-}
-
 const suggestAdded = s => Boolean(state.current) && suggestPieces(s).every(([a, b]) =>
   state.project.clips.some(c => c.src === state.current.path && Math.abs(c.in - a) < 0.05 && Math.abs(c.out - b) < 0.05));
 

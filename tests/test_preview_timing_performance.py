@@ -3,6 +3,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+TOP_START = (Path(__file__).resolve().parent / 'reference_top_start.js').read_text()
+
 
 @unittest.skipUnless(shutil.which('node'), "node isn't installed")
 class PreviewTimingPerformance(unittest.TestCase):
@@ -11,7 +13,7 @@ class PreviewTimingPerformance(unittest.TestCase):
         source = (ui / 'app.js').read_text()
         def function(source, name):
             return 'function ' + name + '(' + source.split('function ' + name + '(', 1)[1].split('\n}\n', 1)[0] + '\n}'
-        code = function(source, 'previewTiming') + function(source, 'topStart')
+        code = function(source, 'previewTiming') + TOP_START
         code += function((ui / 'short.js').read_text(), 'laneTotal')
         script = r'''
 const assert=require('node:assert/strict');

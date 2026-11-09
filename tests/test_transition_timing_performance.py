@@ -3,6 +3,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+TOP_START = (Path(__file__).resolve().parent / 'reference_top_start.js').read_text()
+
 
 @unittest.skipUnless(shutil.which('node'), "node isn't installed")
 class TransitionTimingPerformance(unittest.TestCase):
@@ -18,7 +20,7 @@ let durations=0;
 const outLen=c=>{durations++;return c.len;},laneOf=c=>c.lane||'top',isTop=c=>laneOf(c)==='top';
 const transitionOf=c=>c.transition||'none',tlenOf=c=>c.tlen||.3;
 const state={project:{clips:[]}},preview={idx:1000};
-''' + function(app, 'seamOverlap') + function(app, 'previewTiming') + function(app, 'topStart') + function(short, 'laneTotal') + r'''
+''' + function(app, 'seamOverlap') + function(app, 'previewTiming') + TOP_START + function(short, 'laneTotal') + r'''
 state.project.clips=Array.from({length:2000},()=>({len:5,transition:'fade'}));
 const got=previewTiming();assert.equal(durations,2000,'transition preview must calculate each duration only once');
 const reference=()=>{const lens=state.project.clips.map(c=>isTop(c)?outLen(c):0);return {lens,total:laneTotal('top',state.project.clips),start:topStart(preview.idx),tops:lens.filter(Boolean).length,place:lens.slice(0,preview.idx+1).filter(Boolean).length};};

@@ -3,6 +3,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+TOP_START = (Path(__file__).resolve().parent / 'reference_top_start.js').read_text()
+
 
 @unittest.skipUnless(shutil.which('node'), "node isn't installed")
 class ScrubLookupPerformance(unittest.TestCase):
@@ -10,8 +12,7 @@ class ScrubLookupPerformance(unittest.TestCase):
         ui = Path(__file__).resolve().parents[1] / 'scripts/clipper_ui'
         source = (ui / 'audio.js').read_text()
         seek = 'function seekShort(' + source.split('function seekShort(', 1)[1].split('// The row whose', 1)[0]
-        app = (ui / 'app.js').read_text()
-        start = 'function topStart(' + app.split('function topStart(', 1)[1].split('\nfunction updatePreview(', 1)[0]
+        start = TOP_START
         script = r'''
 const assert=require('node:assert/strict');
 let reads=0;
