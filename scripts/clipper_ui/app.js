@@ -1743,6 +1743,28 @@ function effectPose(clip, vid = video) {
   else if (id === "zoom_out") pose.zoom = 1.15 - 0.15 * t / len;
   else if (id === "punch") pose.zoom = 1 + 0.2 * Math.pow(Math.max(0, 1 - t / 0.35), 2);
   else if (id === "shake") Object.assign(pose, {zoom: 1.06, dx: 0.012 * Math.sin(t * 37), dy: 0.008 * Math.sin(t * 41 + 1)});
+// The hook is edited where it is shown: click it in the preview, type, and Enter or a click away keeps it.
+{
+  const el = $("cHook");
+  const commit = () => {
+    const text = el.innerText.replace(/\s+/g, " ").trim();
+    if (text !== (state.project.hook || "")) {
+      state.project = {...state.project, hook: text};
+      changed(true, "hook");
+    }
+    layoutCard();
+  };
+  el.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+    else if (e.key === "Escape") { el.textContent = state.project.hook || ""; el.blur(); }
+  });
+  el.addEventListener("paste", e => {
+    e.preventDefault();
+    document.execCommand("insertText", false, e.clipboardData.getData("text/plain").replace(/\s+/g, " "));
+  });
+  el.addEventListener("blur", commit);
+}
+
   else if (id === "flash") pose.flash = Math.max(0, 1 - t / 0.25);
   else if (id === "glitch") pose.glitch = glitchAt(t);
   return pose;
@@ -1902,7 +1924,8 @@ function layoutCard() {
   place($("cHandle"), PAD + AVATAR + 24, top + 62);
   place($("cHook"), PAD, top + headerH, W - 2 * PAD);
   Object.assign($("cHook").style, {fontSize: `${spec.hookPx}px`, lineHeight: `${lineH}px`, textAlign: spec.align});
-  $("cHook").textContent = lines.join("\n");
+  if (document.activeElement !== $("cHook")) $("cHook").textContent = lines.join("\n");
+  $("cHook").contentEditable = spec.hookPx ? "plaintext-only" : "false";
   place(mirror, Math.floor((W - cw) / 2), top + headerH + textBlock, cw, ch);
   if (mirror.width !== cw / 2 || mirror.height !== ch / 2) { mirror.width = cw / 2; mirror.height = ch / 2; }
   const capBottom = top + headerH + textBlock + ch - (CAPTION_INSET[formatOf()] || DEFAULT_CAPTION_INSET);
@@ -2607,7 +2630,7 @@ async function loadProject(name) {
 // While streaming Enter clips the selection, except on a control that has its own use for it.
 const ownsEnter = el => Boolean(el.closest("button, a, [role=slider]")) && !["markIn", "markOut", "liveClip", "liveIn", "liveOut", "clipIt"].includes(el.id);
 function typing(e) {
-  return ["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName);
+  return ["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName) || e.target.isContentEditable;
 }
 document.addEventListener("keydown", e => {
   // A dialog sits over the editor, so its keys stay in the dialog.

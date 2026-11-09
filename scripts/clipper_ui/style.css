@@ -268,7 +268,11 @@ body{grid-template-rows:1fr minmax(170px,26vh)}
 .card1080 #cAvatar{position:absolute;border-radius:50%;object-fit:cover}
 .card1080 #cName{position:absolute;font:bold 44px/1 Arial,Helvetica,sans-serif;color:#fff;white-space:nowrap}
 .card1080 #cHandle{position:absolute;font:34px/1 Arial,Helvetica,sans-serif;color:rgb(150,150,155);white-space:nowrap}
-.card1080 #cHook{position:absolute;font:bold 52px/65px Arial,Helvetica,sans-serif;white-space:pre;color:#fff}
+.card1080 #cHook{position:absolute;font:bold 52px/65px Arial,Helvetica,sans-serif;white-space:pre;color:#fff;cursor:text;outline:0;z-index:2}
+.card1080 #cHook:focus{white-space:pre-wrap;box-shadow:0 0 0 4px var(--accent,#6aa8ff);border-radius:6px}
+.card1080 #cHook:empty::before{content:"Add a hook";color:rgba(255,255,255,.0);font-weight:bold}
+.card1080:hover #cHook:empty::before,.card1080 #cHook:empty:focus::before{color:rgba(255,255,255,.35)}
+.card1080 #cHook[contenteditable=false]{pointer-events:none}
 .card1080 #mirror{position:absolute;background:#000;display:block}
 .card1080 #cSafe{position:absolute;display:flex;align-items:center;justify-content:center;font:28px Arial,Helvetica,sans-serif;color:#5e5e5e;border-top:3px dashed #313131;box-sizing:border-box}
 
