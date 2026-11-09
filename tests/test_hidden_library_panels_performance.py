@@ -14,7 +14,6 @@ class HiddenLibraryPanelsPerformance(unittest.TestCase):
         script = r'''
 const assert=require('node:assert/strict');
 let created=0,reads=0,favFilter='';
-const renderFx=()=>{};
 const element=()=>({children:[],hidden:true,attrs:{},set innerHTML(v){this.html=v;this.children=[];},get innerHTML(){return this.html;},appendChild(el){this.children.push(el);},querySelector:()=>element(),setAttribute(k,v){this.attrs[k]=v;}});
 const ids=new Map(),$=id=>{if(!ids.has(id))ids.set(id,element());return ids.get(id);};
 const document={createElement:()=>{created++;return element();}};

@@ -1091,7 +1091,7 @@ function setMode(mode) {
   state.sel = next.clips.length ? 0 : -1;
   resetHistory();
   document.body.dataset.mode = mode;
-  setSideTab(mode === "short" ? "fx" : "media");
+  setSideTab("media");
   setTab(mode === "short" && state.sel >= 0 ? "details" : "clip");
   render();
   if (mode === "short") {

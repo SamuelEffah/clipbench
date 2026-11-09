@@ -49,7 +49,7 @@ const assert=require('assert');let sessionReady=true,tlZoom=1,view={s:0,e:60};co
 const state={project:{name:'one',clips:[{src:'v',in:5,out:20}]},mode:'clip',sel:0,current:{path:'v'}};
 const items=new Map(),localStorage={getItem:k=>items.get(k),setItem:(k,v)=>items.set(k,v)};
 const tnow=()=>13,preview={on:false,idx:0},render=()=>{},byPath=p=>p==='v'?{path:'v',duration:60}:null;
-let opened,redraw=0;const openVideo=async(v,t)=>{opened=[v.path,t]},redrawView=()=>redraw++;
+let opened,redraw=0,sideTab=null;const openVideo=async(v,t)=>{opened=[v.path,t]},redrawView=()=>redraw++,setSideTab=t=>{sideTab=t};
 const closePreview=()=>{},usePreviewPlayers=()=>{},canon=()=>state.project,orient=p=>p,resetHistory=()=>{};
 const $=()=>({}),layoutCard=()=>{},buildSegs=()=>{},fitPhone=()=>{},renderShortTl=()=>{},syncZoomUi=()=>{};
 let started;const startPreviewAt=(i,t)=>{started=[i,t]};

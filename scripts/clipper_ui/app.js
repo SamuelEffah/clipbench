@@ -1101,32 +1101,9 @@ function introLength(c) {
   return d >= 0.05 ? Math.round(d * 1000) / 1000 : 0;
 }
 
-const GROUPS = [
-  {group: "", items: [["none", "No effect", {effect: "none"}]]},
-  {group: "Transitions", shortOnly: true, items: [["t_none", "Cut", {transition: "none"}], ...TRANSITIONS.map(([id, label]) => [`t_${id}`, label, {transition: id}])]},
-  {group: "Camera moves", items: [["zoom_in", "Zoom in"], ["zoom_out", "Zoom out"], ["punch", "Punch in"], ["shake", "Shake"]].map(([id, label]) => [id, label, {effect: id}])},
-  {group: "Looks", items: [["flash", "Flash"], ["bw", "Black and white"], ["vignette", "Vignette"], ["glitch", "Glitch"]].map(([id, label]) => [id, label, {effect: id}])},
-  {group: "Fades", items: [
-    ["no_fade", "No fade", {fadeIn: 0, fadeOut: 0}],
-    ["fade_in", "Fade in", {fadeIn: 0.5}],
-    ["fade_out", "Fade out", {fadeOut: 0.5}],
-    ["fade_both", "Fade in and out", {fadeIn: 0.5, fadeOut: 0.5}],
-  ]},
-  {group: "Speed and hold", items: [
-    ["normal", "Normal speed", {ramp: "none", freeze: 0}],
-    ["hero", "Slow-mo hit", {ramp: "hero"}],
-    ["slowdown", "Slow down", {ramp: "slowdown"}],
-    ["speedup", "Speed up", {ramp: "speedup"}],
-    ["hold", "Hold last frame", {freeze: 1}],
-  ]},
-];
-const TILE_LABELS = Object.fromEntries(GROUPS.flatMap(g => g.items.map(([id, label]) => [id, label])));
-const effectName = id => TILE_LABELS[id] || "No effect";
 const effectOf = c => c.effect || "none";
 const EFFECT_MIME = "application/x-effect";
 const isEffectDrag = e => Array.from(e.dataTransfer.types || []).includes(EFFECT_MIME);
-const matchesPatch = (c, patch) => Object.entries(patch).every(([k, v]) => (c[k] === undefined ? (k === "effect" || k === "ramp" || k === "transition" ? "none" : 0) : c[k]) === v);
-
 function firstInLane(i) {
   const clips = state.project.clips;
   return !clips.slice(0, i).some(c => laneOf(c) === laneOf(clips[i]));
@@ -1151,74 +1128,6 @@ function dropEffect(e, i) {
   } catch {
     toast("Couldn't apply that effect");
   }
-}
-
-function swatchHtml(id) {
-  const list = RAMPS[id];
-  if (id === "normal" || id === "hold" || list) {
-    const steps = RAMPS[id] || RAMPS.none;
-    const y = r => 46 - r / 1.7 * 38;
-    const path = steps.map(([a, b, r]) => `${a === 0 ? "M" : "L"}${a * 100},${y(r)} L${b * 100},${y(r)}`).join(" ");
-    const pause = id === "hold" ? '<rect x="62" y="18" width="7" height="22" rx="1.5"/><rect x="76" y="18" width="7" height="22" rx="1.5"/>' : "";
-    return `<span class="swatch curve"><svg viewBox="0 0 100 54" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" fill="none" stroke="currentColor" stroke-width="3" vector-effect="non-scaling-stroke"/>${pause}</svg></span>`;
-  }
-  return `<span class="swatch fx-${id}"><i></i></span>`;
-}
-
-// The how-to line is for the first visit; once any clip has an effect, a transition, a fade or a speed change it goes away.
-const usesEffects = c => effectOf(c) !== "none" || transitionOf(c) !== "none" || Boolean(c.fadeIn || c.fadeOut) || rampOf(c) !== "none" || freezeOf(c) > 0;
-
-function renderFx() {
-  if (state.mode === "short" || $("fxPanel").hidden) return;
-  const grid = $("fxGrid");
-  $("fxHint").hidden = state.project.clips.some(usesEffects);
-  const current = state.project.clips[state.sel];
-  grid.replaceChildren(...GROUPS.filter(g => inShort() || !g.shortOnly).flatMap(({group, items}) => {
-    const nodes = [];
-    if (group) {
-      const h = document.createElement("h4");
-      h.textContent = group;
-      nodes.push(h);
-    }
-    const row = document.createElement("div");
-    row.className = "fxrow";
-    for (const [id, label, patch] of items) {
-      const tile = document.createElement("button");
-      const on = Boolean(current) && matchesPatch(current, patch);
-      tile.type = "button";
-      tile.className = "fx";
-      tile.draggable = true;
-      tile.setAttribute("aria-pressed", on);
-      tile.innerHTML = `${swatchHtml(id)}<span class="fxname">${label}</span>`;
-      tile.ondragstart = e => {
-        e.dataTransfer.setData(EFFECT_MIME, JSON.stringify({patch, label}));
-        e.dataTransfer.effectAllowed = "copy";
-        if (patch.transition !== undefined) {
-          e.dataTransfer.setData(TRANSITION_MIME, "1");
-          document.body.classList.add("tdrag");
-        }
-      };
-      tile.ondragend = () => document.body.classList.remove("tdrag");
-      tile.onclick = () => (on && id === "hold" ? applyPatch(state.sel, {freeze: 0}, "Hold removed") : applyPatch(state.sel, patch, label));
-      row.appendChild(tile);
-    }
-    nodes.push(row);
-    return nodes;
-  }));
-}
-
-function tagLine(c) {
-  const tags = [];
-  if (speedOf(c) !== 1) tags.push(`${speedOf(c)}x speed`);
-  if (c.fit === "fill") tags.push("filled");
-  if (effectOf(c) !== "none") tags.push(effectName(effectOf(c)));
-  if (rampOf(c) !== "none") tags.push(effectName(rampOf(c)));
-  if (freezeOf(c)) tags.push(`hold ${freezeOf(c)}s`);
-  if (c.fadeIn || c.fadeOut) tags.push("fade");
-  if (transitionOf(c) !== "none") tags.push(`${TRANSITION_NAMES[transitionOf(c)]} in`);
-  if (volumeOf(c) === 0) tags.push("muted");
-  else if (volumeOf(c) !== 1) tags.push(`${Math.round(volumeOf(c) * 100)}% sound`);
-  return tags.length ? `<small class="tags">${tags.join(", ")}</small>` : "";
 }
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -1418,7 +1327,6 @@ function render() {
   v.className = ok ? "good" : "bad";
   if (preview.on) layoutCard();
   renderShortOptions();
-  renderFx();
   renderFavs();
   renderShortMode();
   if (typeof ensureVoices === "function") ensureVoices();
@@ -3115,21 +3023,17 @@ $("dlUrl").onkeydown = e => { if (e.key === "Enter" && !downloading) startDownlo
 $("dlClose").onclick = () => $("dlDlg").close();
 
 function setSideTab(which) {
-  $("fxPanel").hidden = which !== "fx";
   $("favPanel").hidden = which !== "fav";
   $("audioPanel").hidden = which !== "audio";
   $("mediaPanel").hidden = which !== "media";
   $("dlBtn").hidden = which !== "media";
   $("tabMedia").setAttribute("aria-selected", which === "media");
-  $("tabFx").setAttribute("aria-selected", which === "fx");
   $("tabFav").setAttribute("aria-selected", which === "fav");
   $("tabAudio").setAttribute("aria-selected", which === "audio");
   if (which === "media") renderLibrary();
   else if (which === "fav") renderFavs();
-  else if (which === "fx") renderFx();
 }
 $("tabMedia").onclick = () => setSideTab("media");
-$("tabFx").onclick = () => setSideTab("fx");
 $("tabFav").onclick = () => setSideTab("fav");
 
 const sameMoment = (a, b) => a.src === b.src && Math.abs(a.in - b.in) < 0.05 && Math.abs(a.out - b.out) < 0.05;
@@ -3288,6 +3192,7 @@ async function loadAssets() {
 }
 
 async function refreshLibrary() {
+    setSideTab("media");
   state.library = await api(`/api/library${projectQuery()}`);
   if (state.current) state.current = state.library.find(v => v.id === state.current.id) || null;
   render();
