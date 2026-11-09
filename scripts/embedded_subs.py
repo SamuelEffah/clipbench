@@ -40,7 +40,8 @@ def tidy(found):
 @functools.lru_cache(maxsize=64)
 def english_stream(src):
     """The index of the best English subtitle stream in the file, or None. Full dialogue wins over closed captions,
-    which add sound notes, and over a forced track, which only carries signs."""
+    which add sound notes, and over a forced track, which only carries signs. A dubtitle track is an AI transcript of the
+    dub audio rather than the show's lines, so it is picked only when nothing else is English."""
     probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "s", "-show_entries", "stream=index:stream_tags=language,title",
                             "-of", "json", src], capture_output=True, text=True)
     try:
@@ -50,7 +51,7 @@ def english_stream(src):
 
     def rank(stream):
         title = (stream.get("tags", {}).get("title") or "").lower()
-        return ("forced" in title or "sign" in title, "cc" in title.split() or "sdh" in title)
+        return ("dub" in title, "forced" in title or "sign" in title, "cc" in title.split() or "sdh" in title)
 
     english = [s for s in streams if (s.get("tags", {}).get("language") or "").lower() in ENGLISH]
     return min(english, key=rank)["index"] if english else None

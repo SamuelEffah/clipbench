@@ -53,6 +53,22 @@ class EmbeddedSubtitleTests(unittest.TestCase):
         words = embedded_subs.words(self.src, 0, 8)
         self.assertEqual([w[0] for w in words], ["Hello", "there", "friend", "Second", "line"])
 
+    def test_an_ai_dub_track_loses_to_the_real_english_one_even_when_it_comes_first(self):
+        dub = Path(self.tmp.name) / "dub.srt"
+        full = Path(self.tmp.name) / "full.srt"
+        dub.write_text("1\n00:00:01,000 --> 00:00:03,000\nDUB WORDS HERE\n")
+        full.write_text(SRT)
+        src = str(Path(self.tmp.name) / "dubfirst.mkv")
+        cmd = ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=black:s=64x64:r=10:d=8", "-i", str(dub), "-i", str(full),
+               "-map", "0:v", "-map", "1:0", "-map", "2:0", "-c:v", "libx264", "-c:s", "srt",
+               "-metadata:s:s:0", "language=en", "-metadata:s:s:0", "title=Dubtitle(AI)",
+               "-metadata:s:s:1", "language=eng", "-metadata:s:s:1", "title=English [Group]", src]
+        self.assertEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
+        embedded_subs.english_stream.cache_clear()
+        embedded_subs.all_cues.cache_clear()
+        words = embedded_subs.words(src, 0, 8)
+        self.assertEqual([w[0] for w in words], ["Hello", "there", "friend", "Second", "line"])
+
     def test_words_are_timed_from_the_start_of_the_range(self):
         words = embedded_subs.words(self.src, 1, 7)
         self.assertAlmostEqual(words[0][1], 0.0, delta=0.15)
