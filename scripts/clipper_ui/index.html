@@ -186,7 +186,7 @@
       <button class="tab" id="tabShorts" aria-selected="false" title="Every Short you have rendered, and where it is on YouTube">Shorts</button>
     </div>
     <div class="insp panel" id="panelClip">
-      <div class="cliphead phead"><h2>Clips <span class="num" id="lhTotal">0</span></h2></div>
+      <div class="cliphead phead"><h2>Clips <span class="num" id="lhTotal">0</span></h2><span class="sp"></span><button class="ico" data-draft aria-label="Draft Short" title="Draft Short: build a Short from these clips, in video order, the best parts of the long ones, laid out and captioned"><svg class="i"><use href="#c-shorts"/></svg></button></div>
       <div class="cutlist" id="liveCaps" hidden aria-label="Clips being cut"></div>
       <div class="dsearch"><svg class="i"><use href="#search"/></svg><input id="dq" type="search" placeholder="Search what they say" aria-label="Search the subtitles of every video" autocomplete="off" spellcheck="false"><button class="ico" id="dclear" hidden aria-label="Clear search" title="Clear"><svg class="i"><use href="#close"/></svg></button></div>
       <div class="dlisten" id="dlisten" hidden aria-live="polite"></div>
@@ -222,7 +222,7 @@
   </nav>
   <div class="railpop" id="railPop" hidden>
     <section data-panel="clips" aria-label="Clips" hidden>
-      <div class="ph"><h2>Clips</h2><span class="sp"></span><span class="count num" id="bankCount"></span><button class="ico" data-close aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
+      <div class="ph"><h2>Clips</h2><span class="sp"></span><span class="count num" id="bankCount"></span><button class="ico" data-draft aria-label="Draft Short" title="Draft Short: build a Short from these clips, in video order, the best parts of the long ones, laid out and captioned"><svg class="i"><use href="#c-shorts"/></svg></button><button class="ico" data-close aria-label="Close"><svg class="i"><use href="#close"/></svg></button></div>
       <div class="rows" id="bankRows"></div>
     </section>
     <section data-panel="transitions" aria-label="Transitions" hidden>
@@ -285,7 +285,6 @@
     <button class="ti" id="delBtn" aria-label="Delete the clip under the playhead" title="Delete the clip under the playhead (Delete)"><svg class="i"><use href="#trash"/></svg></button>
     <button class="ti" id="muteBtn" aria-label="Mute the clip" title="Mute the clip (M)"><svg class="i"><use href="#c-vol"/></svg></button>
     <button class="ti" id="suggestBtn" aria-label="Suggest clips" title="Suggest clips: find the moments in this video worth cutting"><svg class="i"><use href="#r-fx"/></svg></button>
-    <button class="ti" id="draftBtn" aria-label="Draft Short" title="Draft Short: put the best moment of this video on this project's timeline, laid out, captioned and trimmed to length"><svg class="i"><use href="#c-shorts"/></svg></button>
     <span class="div"></span>
     <span class="histslot" id="histClip"><button class="ti hist" id="undoBtn" aria-label="Undo" title="Undo (Cmd Z)" disabled><svg class="i"><use href="#undo"/></svg></button><button class="ti hist" id="redoBtn" aria-label="Redo" title="Redo (Cmd Shift Z)" disabled><svg class="i"><use href="#redo"/></svg></button></span>
   </div>

@@ -67,8 +67,8 @@ function topShare(pieces, template) {
   return Number(Math.min(CAM_LANE[1], Math.max(CAM_LANE[0], natural)).toFixed(3));
 }
 
-// The longest a Short runs. Pieces past it are dropped and the last one kept is trimmed to land on it.
-const SHORT_MAX = 40;
+// The longest a Short runs. There is no cap: nothing is dropped or trimmed for length. Set a number to bring the cap back.
+const SHORT_MAX = Infinity;
 function fitLength(pieces, max = SHORT_MAX, lengthOf = outLen) {
   const kept = [];
   let left = max;
