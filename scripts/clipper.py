@@ -2831,6 +2831,7 @@ class Handler(BaseHTTPRequestHandler):
     "/tighten.js": ("tighten.js", "text/javascript"),
     "/review.js": ("review.js", "text/javascript"),
     "/autolayout.js": ("autolayout.js", "text/javascript"),
+    "/retime.js": ("retime.js", "text/javascript"),
     "/drafts.js": ("drafts.js", "text/javascript"),
     "/reframebox.js": ("reframebox.js", "text/javascript"),
     "/lanes.js": ("lanes.js", "text/javascript"),

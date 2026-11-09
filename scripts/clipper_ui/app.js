@@ -258,6 +258,7 @@ function recordEdit(key) {
 function changed(keepDom, key = "") {
   recordEdit(key);
   editCount++;
+  if (typeof scheduleRetime === "function") scheduleRetime();
   unsaved = true;
   $("saved").textContent = "Saving";
   clearTimeout(saveTimer);
