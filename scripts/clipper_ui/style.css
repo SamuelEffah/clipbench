@@ -1701,13 +1701,6 @@ body[data-mode="short"] .stl-track.cliptext{position:relative;height:16px;min-he
 #renderBtn:disabled{opacity:.7;cursor:default}
 #renderBtn svg.i{width:16px;height:16px;stroke-width:1.7}
 .shbtn .badge.pulse{min-width:9px;width:9px;height:9px;padding:0}
-.edbody{display:grid;gap:16px;padding:16px 18px 6px;overflow:auto}
-.edfield{display:grid;gap:6px}
-.edfield>span{font-size:12px;color:var(--dim);display:flex;justify-content:space-between}
-.edfield em{font-style:normal;color:var(--faint)}
-.edfield input,.edfield textarea{font:inherit;font-size:13px;line-height:1.45;color:var(--text);background:var(--bg);border:1px solid var(--line2,#3a3a40);border-radius:8px;padding:9px 11px;width:100%;box-sizing:border-box;resize:vertical}
-.edfield input:focus,.edfield textarea:focus{outline:none;border-color:var(--faint)}
-.edsaved{color:var(--faint);font-size:11px;min-height:14px}
 #cbGrip{display:none}
 body[data-mode="clip"] #cbGrip{display:block;position:absolute;left:0;right:0;top:-4px;height:8px;z-index:60;cursor:grab;touch-action:none}
 body[data-mode="clip"] #cbGrip.active{cursor:grabbing}

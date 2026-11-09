@@ -231,55 +231,6 @@ function dialogRow(s) {
   return row;
 }
 
-// Editing a Short opens a second dialog over the list. It saves to the Short's folder as you type, and the upload uses what is saved.
-const TITLE_MAX = 100;
-let editing = null, editTimer = null;
-
-async function saveEdit() {
-  editTimer = null;
-  const target = editing;
-  if (!target) return;
-  try {
-    await api(`/api/publish/${target.name}`, "POST", {title: $("edTitle").value, description: $("edDesc").value});
-    target.title = $("edTitle").value.trim();
-  } catch (err) {
-    toast(`Couldn't save: ${err.message}`);
-  }
-}
-
-function changedEdit() {
-  $("edCount").textContent = `${$("edTitle").value.length}/${TITLE_MAX}`;
-  clearTimeout(editTimer);
-  editTimer = setTimeout(saveEdit, 600);
-}
-
-async function openEditDialog(s) {
-  editing = s;
-  $("edName").textContent = s.name;
-  $("edTitle").disabled = $("edDesc").disabled = true;
-  $("edTitle").value = $("edDesc").value = "";
-  $("editDlg").showModal();
-  try {
-    const data = await api(`/api/publish/${s.name}`);
-    if (editing !== s) return;
-    $("edTitle").value = data.title;
-    $("edDesc").value = data.description;
-    $("edCount").textContent = `${data.title.length}/${TITLE_MAX}`;
-    $("edTitle").disabled = $("edDesc").disabled = false;
-    $("edTitle").focus();
-  } catch (err) {
-    toast(`Couldn't load: ${err.message}`);
-  }
-}
-
-$("edTitle").oninput = $("edDesc").oninput = changedEdit;
-$("edBack").onclick = $("edClose").onclick = () => $("editDlg").close();
-$("editDlg").addEventListener("close", async () => {
-  if (editTimer) { clearTimeout(editTimer); await saveEdit(); }
-  editing = null;
-  if ($("shortsDlg").open) openShortsDialog();
-});
-
 // A render that failed, until the list is closed.
 function failedRow() {
   const row = document.createElement("div");
