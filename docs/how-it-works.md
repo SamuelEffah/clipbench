@@ -26,6 +26,15 @@ video becomes a published Short. The README covers installing and starting.
 
 ## Where things live
 
+The root page serves `studio.html`, `studio.css`, and `studio.js`. Profiles and project
+ownership live in SQLite; the browser remembers only the last selected profile. Schema
+migration assigns existing projects to `default` without changing their saved edits.
+`profile_accounts.py` creates a Publisher per profile. Its settings adapter namespaces
+credentials and channel identity; Default retains the original keys for compatibility.
+OAuth callbacks resolve their profile from the pending state, and uploads and render
+watermarks resolve the account from the project's stored owner rather than browser state.
+Source files and their existing project ownership rules remain in the same workspace.
+
 Code sits in the repository. Everything the app downloads, makes or remembers
 sits under `workspace/`, which git ignores as a whole.
 

@@ -40,3 +40,15 @@ class HomeProject(unittest.TestCase):
             self.assertTrue(store.create_project('named',{'clips':[{'caption':'keep'}]}))
             self.assertFalse(store.create_project('named',{'clips':[]}))
             self.assertEqual(store.get_project('named')['clips'],[{'caption':'keep'}])
+
+    def test_project_with_sources_but_no_clips_is_not_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store=Store(Path(tmp)/'test.db')
+            store.create_project('empty',{'clips':[]})
+            store.create_project('footage',{'clips':[]})
+            store.claim_video('/media/video.mp4','footage')
+            recent={p['name']:p for p in store.recent_projects(None)}
+            self.assertEqual(recent['empty']['sources'],0)
+            self.assertEqual(recent['footage']['sources'],1)
+            self.assertEqual(recent['footage']['src'],'/media/video.mp4')
+            self.assertEqual(recent['footage']['clips'],0)

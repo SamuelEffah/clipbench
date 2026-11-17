@@ -6,12 +6,14 @@ threaded HTTP server and the upload threads never share one.
 import json
 import sqlite3
 import time
+import uuid
 from contextlib import closing
 from pathlib import Path
 from thumbnails import favorite_identity
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (name TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS profiles (id TEXT PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE UNIQUE, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS video_owners (path TEXT NOT NULL, project TEXT NOT NULL, PRIMARY KEY (path, project));
 CREATE TABLE IF NOT EXISTS extra_videos (path TEXT PRIMARY KEY, added_at REAL NOT NULL);
@@ -45,6 +47,10 @@ class Store:
         fresh = not self.path.exists()
         with self._db() as db:
             db.executescript(SCHEMA)
+            db.execute("INSERT OR IGNORE INTO profiles VALUES ('default','Default',?)", (time.time(),))
+            if "profile_id" not in {r["name"] for r in db.execute("PRAGMA table_info(projects)")}:
+                db.execute("ALTER TABLE projects ADD COLUMN profile_id TEXT NOT NULL DEFAULT 'default'")
+            db.execute("CREATE INDEX IF NOT EXISTS projects_profile ON projects(profile_id, updated_at)")
             if "project" not in {r["name"] for r in db.execute("PRAGMA table_info(favorites)")}:
                 db.execute("ALTER TABLE favorites ADD COLUMN project TEXT")
             db.execute("CREATE INDEX IF NOT EXISTS favorites_project ON favorites (project, id)")
@@ -64,9 +70,72 @@ class Store:
         conn.execute("PRAGMA journal_mode=WAL")
         return _Session(conn)
 
-    def list_projects(self):
+    def list_profiles(self):
         with self._db() as db:
-            return [r["name"] for r in db.execute("SELECT name FROM projects ORDER BY name")]
+            return [dict(r) for r in db.execute("SELECT p.id,p.name,COUNT(j.name) AS projects FROM profiles p LEFT JOIN projects j ON j.profile_id=p.id GROUP BY p.id ORDER BY p.created_at,p.id")]
+
+    def get_profile(self, profile_id):
+        with self._db() as db:
+            row = db.execute("SELECT id,name FROM profiles WHERE id=?", (profile_id,)).fetchone()
+        return dict(row) if row else None
+
+    def create_profile(self, name):
+        name = name.strip()
+        if not name or len(name) > 60 or any(ord(c) < 32 for c in name):
+            raise ValueError("Use a profile name between 1 and 60 characters.")
+        profile_id = uuid.uuid4().hex
+        try:
+            with self._db() as db:
+                db.execute("INSERT INTO profiles VALUES (?,?,?)", (profile_id, name, time.time()))
+        except sqlite3.IntegrityError:
+            raise ValueError("A profile with this name already exists.") from None
+        return {"id": profile_id, "name": name}
+
+    def profile_defaults(self, profile_id):
+        return {"format": "9:16", "capSize": 50, "normalize": False, "watermark": True,
+                **(self.get_setting(f"profile_defaults:{profile_id}") or {})}
+
+    def update_profile(self, profile_id, name, defaults):
+        name = name.strip()
+        if not name or len(name) > 60 or any(ord(c) < 32 for c in name):
+            raise ValueError("Use a profile name between 1 and 60 characters.")
+        if not isinstance(defaults, dict) or set(defaults) != {"format", "capSize", "normalize", "watermark"}:
+            raise ValueError("Invalid project defaults.")
+        if defaults["format"] not in ("9:16", "4:5", "1:1", "16:9") or type(defaults["capSize"]) is not int or not 30 <= defaults["capSize"] <= 120 or any(type(defaults[k]) is not bool for k in ("normalize", "watermark")):
+            raise ValueError("Invalid project defaults.")
+        try:
+            with self._db() as db:
+                if not db.execute("UPDATE profiles SET name=? WHERE id=?", (name, profile_id)).rowcount:
+                    raise ValueError("Profile not found.")
+                db.execute("INSERT OR REPLACE INTO settings VALUES (?,?)", (f"profile_defaults:{profile_id}", json.dumps(defaults)))
+        except sqlite3.IntegrityError:
+            raise ValueError("A profile with this name already exists.") from None
+
+    def delete_profile(self, profile_id):
+        if profile_id == 'default':
+            raise ValueError("Keep the Default profile as your starting space.")
+        with self._db() as db:
+            if db.execute("SELECT 1 FROM projects WHERE profile_id=?", (profile_id,)).fetchone():
+                raise ValueError("Move or delete this profile's projects first.")
+            if not db.execute("DELETE FROM profiles WHERE id=?", (profile_id,)).rowcount:
+                raise ValueError("Profile not found.")
+            db.execute("DELETE FROM settings WHERE key=? OR substr(key,1,?)=?", (f"profile_defaults:{profile_id}", len(f"profile:{profile_id}:"), f"profile:{profile_id}:"))
+
+    def project_profile(self, name):
+        with self._db() as db:
+            row = db.execute("SELECT profile_id FROM projects WHERE name=?", (name,)).fetchone()
+        return row["profile_id"] if row else None
+
+    def move_project(self, name, profile_id):
+        with self._db() as db:
+            if not db.execute("SELECT 1 FROM profiles WHERE id=?", (profile_id,)).fetchone():
+                raise ValueError("Profile not found.")
+            if not db.execute("UPDATE projects SET profile_id=? WHERE name=?", (profile_id, name)).rowcount:
+                raise ValueError("Project not found.")
+
+    def list_projects(self, profile_id=None):
+        with self._db() as db:
+            return [r["name"] for r in db.execute("SELECT name FROM projects WHERE (? IS NULL OR profile_id=?) ORDER BY name", (profile_id, profile_id))]
 
     def home_project(self, preferred=None):
         """Only load the last opened project, or the most recently edited fallback."""
@@ -81,17 +150,19 @@ class Store:
         thumb = next((c.get("thumb") for c in clips if isinstance(c, dict) and isinstance(c.get("thumb"), str) and c["thumb"].startswith("/clip-thumb/")), None)
         return {"name": row["name"], "updated_at": row["updated_at"], "thumb": thumb}
 
-    def recent_projects(self, limit=3):
+    def recent_projects(self, limit=3, profile_id=None):
         """The most recently edited projects (all of them when limit is None), each with its thumbnail and clip count."""
         with self._db() as db:
-            rows = db.execute("SELECT name,data,updated_at FROM projects ORDER BY updated_at DESC,name LIMIT ?", (-1 if limit is None else limit,)).fetchall()
+            rows = db.execute("SELECT name,data,updated_at FROM projects WHERE (? IS NULL OR profile_id=?) ORDER BY updated_at DESC,name LIMIT ?", (profile_id, profile_id, -1 if limit is None else limit)).fetchall()
+        owners = self.video_owners()
         out = []
         for row in rows:
             data = json.loads(row["data"])
             clips = [c for c in (data.get("clips") or data.get("bank") or []) if isinstance(c, dict)]
             thumb = next((c["thumb"] for c in clips if isinstance(c.get("thumb"), str) and c["thumb"].startswith("/clip-thumb/")), None)
-            src = next((c["src"] for c in clips if isinstance(c.get("src"), str)), None)
-            out.append({"name": row["name"], "updated_at": row["updated_at"], "thumb": thumb, "clips": len(clips), "src": src})
+            sources = used_paths(data) | {path for path, names in owners.items() if row["name"] in names}
+            src = next((c["src"] for c in clips if isinstance(c.get("src"), str)), next(iter(sorted(sources)), None))
+            out.append({"name": row["name"], "updated_at": row["updated_at"], "thumb": thumb, "clips": len(clips), "src": src, "sources": len(sources)})
         return out
 
     def iter_projects(self):
@@ -111,11 +182,39 @@ class Store:
                        "ON CONFLICT(name) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at",
                        (name, json.dumps(data), time.time()))
 
-    def create_project(self, name, data):
+    def create_project(self, name, data, profile_id='default'):
         """Create once without replacing another project's edits."""
         with self._db() as db:
-            result = db.execute("INSERT OR IGNORE INTO projects (name,data,updated_at) VALUES (?,?,?)", (name, json.dumps(data), time.time()))
+            if not db.execute("SELECT 1 FROM profiles WHERE id=?", (profile_id,)).fetchone():
+                raise ValueError("Profile not found.")
+            result = db.execute("INSERT OR IGNORE INTO projects (name,data,updated_at,profile_id) VALUES (?,?,?,?)", (name, json.dumps(data), time.time(), profile_id))
             return result.rowcount == 1
+
+    def manage_project(self, source, target, duplicate=False):
+        """Atomically rename or copy edits, profile ownership, saved clips and sources."""
+        with self._db() as db:
+            row = db.execute("SELECT * FROM projects WHERE name=?", (source,)).fetchone()
+            if row is None:
+                raise ValueError("Project not found.")
+            if db.execute("SELECT 1 FROM projects WHERE name=?", (target,)).fetchone():
+                raise ValueError("A project with this name already exists.")
+            data = json.loads(row["data"])
+            data["name"] = target
+            db.execute("INSERT INTO projects (name,data,updated_at,profile_id) VALUES (?,?,?,?)",
+                       (target, json.dumps(data), time.time(), row["profile_id"]))
+            db.execute("INSERT INTO video_owners (path,project) SELECT path,? FROM video_owners WHERE project=?", (target, source))
+            db.execute("INSERT INTO favorites (data,project) SELECT data,? FROM favorites WHERE project=?", (target, source))
+            # Keep timeline sources owned by the new project.
+            for path in used_paths(data):
+                db.execute("INSERT OR IGNORE INTO video_owners VALUES (?,?)", (path, target))
+            setting = db.execute("SELECT value FROM settings WHERE key=?", (f"own_media:{source}",)).fetchone()
+            if setting:
+                db.execute("INSERT INTO settings VALUES (?,?)", (f"own_media:{target}", setting["value"]))
+            if not duplicate:
+                db.execute("DELETE FROM projects WHERE name=?", (source,))
+                db.execute("DELETE FROM favorites WHERE project=?", (source,))
+                db.execute("DELETE FROM video_owners WHERE project=?", (source,))
+                db.execute("DELETE FROM settings WHERE key=?", (f"own_media:{source}",))
 
     def delete_project(self, name):
         """Forget a project: its edits, its Saved clips, and which videos it claimed. Files on disk are never touched."""

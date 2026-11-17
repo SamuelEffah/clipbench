@@ -173,6 +173,13 @@ function toast(msg) {
 }
 
 async function api(path, method = "GET", body) {
+  if (/^\/api\/(youtube(?:\/|$)|projects$|shorts$|video-stats$)/.test(path) || (method === "PUT" && path.startsWith("/api/project/"))) {
+    let profile = state.profileId;
+    if (!profile) { try { profile = localStorage.getItem('clipbench.profile'); } catch {} }
+    const requestedProject = state.project.name === 'untitled' ? new URLSearchParams(location.search).get('project') : null;
+    const query = new URLSearchParams({project: requestedProject || state.project.name, profile: profile || 'default'});
+    path += (path.includes('?') ? '&' : '?') + query;
+  }
   const res = await fetch(path, {method, headers: body ? {"Content-Type": "application/json"} : {}, body: body ? JSON.stringify(body) : undefined});
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || data.message || res.statusText);
@@ -2479,6 +2486,8 @@ async function loadProject(name) {
   await flushSave();
   try {
     const data = await api(`/api/project/${clean}`);
+    state.profileId = data.profile_id || 'default';
+    try { localStorage.setItem('clipbench.profile', state.profileId); } catch {}
     if (preview.on) closePreview();
     video.pause();
     const stored = {name: clean, hook: data.hook || "", frame: data.frame || "auto", layout: data.layout || "title", format: data.format || "9:16", template: data.template || "full", capSize: data.capSize || 0, normalize: Boolean(data.normalize), watermark: data.watermark !== false, blurBg: Boolean(data.blurBg), fade: data.fade || 0, audio: data.audio || [], clips: data.clips || [], bank: data.bank || (data.clips || []).map(c => ({...c}))};
@@ -2489,6 +2498,7 @@ async function loadProject(name) {
     dropVideo();
     await loadAssets();
     rememberProject(clean);
+    await loadChannel();
     await restoreEditorSession();
     $("saved").textContent = "Opened";
   } catch (err) {
@@ -3238,7 +3248,6 @@ async function loadChannel() {
 }
 
 async function init() {
-  loadChannel();
   try {
     const names = await api("/api/projects");
     projectNames = names;
@@ -3256,6 +3265,14 @@ async function init() {
   }
   sessionReady = true;
   render();
+  const entry = new URLSearchParams(location.search);
+  if (entry.get("add") === "1" && entry.get("project") === state.project.name) {
+    setMode("clip");
+    $("addVideosContext").textContent = `Bring footage into “${state.project.name}” to start editing.`;
+    $("addVideosDialog").showModal();
+    entry.delete("add");
+    history.replaceState(null, "", location.pathname + "?" + entry.toString());
+  }
   if (new URLSearchParams(location.search).get("new") === "1") { openProjectModal(); startNaming(null); }
   requestAnimationFrame(tick);
   watchCuts();
@@ -3264,3 +3281,9 @@ async function init() {
 }
 // Wait for the other scripts: init draws the page with functions they define.
 document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", init) : init();
+
+const goHome = async event => { event.preventDefault(); await flushSave(); location.assign("/"); };
+$("editorHome").onclick = goHome;
+
+$("addVideosClose").onclick = () => $("addVideosDialog").close();
+$("addVideosChoose").onclick = () => { $("addVideosDialog").close(); $("srcPick").click(); };

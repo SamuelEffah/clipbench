@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clipbench — Profiles preview</title>
+<link rel="icon" type="image/svg+xml" href="/assets/planet-logo.svg">
+<link rel="stylesheet" href="/home.css"><link rel="stylesheet" href="/profiles-preview.css">
+<script src="/planet.js" defer></script><script src="/profiles-preview.js" defer></script>
+</head>
+<body class="has-project">
+<a class="home-brand" href="/" aria-label="Clipbench home"><img src="/assets/planet-logo.svg" alt="" width="24" height="24"><span>Clipbench</span><span class="preview-badge">Preview</span></a>
+<div class="profile-control">
+<div class="menu-label"><span>Profiles</span><button id="add-profile" aria-label="Create profile">+</button></div>
+<div id="profile-options" aria-label="Profiles"></div>
+</div>
+<main class="home" aria-label="Clipbench profiles preview">
+<section class="planet-panel" aria-label="Mars"><div class="planet-caption"><span>Your next great clip<br>starts here.</span><small>Made in Clipbench</small></div><div class="planet"><img id="planet-fallback" src="/assets/mars.jpg" alt="Mars photographed from space" width="540" height="810"><canvas id="planet-canvas" role="img" aria-label="Mars slowly rotating on its axis" hidden></canvas></div></section>
+<section class="connect-panel" aria-labelledby="resume-title"><header class="workspace-bar"><div class="profile-eyebrow"><span id="profile-context">Default profile</span><span class="sample-label" id="sample-label" hidden>Sample projects</span></div><div class="header-actions"><button id="connections-toggle" aria-label="Connections" title="Connections" aria-expanded="false" aria-controls="connections-panel"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 3 4 4m4-4-4 4m-5 0h10v4a5 5 0 0 1-10 0V7Zm5 9v5"/></svg></button></div></header><section id="connections-panel" aria-label="Connections" hidden><div class="connections-heading"><button id="connections-close" aria-label="Close connections">×</button></div>
+
+<div class="connected-channel"><span class="channel-avatar youtube-avatar" aria-hidden="true"><svg width="27" height="20" viewBox="0 0 28 20"><path fill="#ff0033" d="M27.4 3.1A3.5 3.5 0 0 0 25 .6C22.9 0 14 0 14 0S5.1 0 3 .6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9A3.5 3.5 0 0 0 3 19.4c2.1.6 11 .6 11 .6s8.9 0 11-.6a3.5 3.5 0 0 0 2.4-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z"/><path fill="#fff" d="m11 14.3 7.3-4.3L11 5.7Z"/></svg></span><div><strong id="channel-name">YouTube channel</strong><small id="channel-state">Not connected</small></div><span id="connection-status" class="connection-status">Not connected</span></div>
+<button id="channel-action" class="connection-action">Connect YouTube</button>
+<p id="connection-note" role="status"></p>
+</section><div class="home-content">
+
+<section id="home-project" aria-labelledby="resume-title"><div class="project-heading"><div><h1 id="resume-title">Your projects</h1><p class="heading-description">A space for every story you want to tell.</p></div><button class="new-primary" id="new-project"><span aria-hidden="true">+</span> New project</button></div><div class="home-lbl"><span>Recent projects <span id="project-count"></span></span><span class="sort-label">Last edited ↓</span></div><div id="home-recent"></div><div id="empty-projects" hidden><p>No projects yet</p><span>Start your first project in this profile.</span></div></section>
+
+<p id="preview-status" class="sr-status" role="status" aria-live="polite"></p>
+</div></section>
+</main>
+<footer><a href="https://space.jpl.nasa.gov/tmaps/mars.html" target="_blank" rel="noopener noreferrer">Mars imagery: NASA/JPL/USGS</a></footer>
+<dialog id="preview-dialog" aria-labelledby="dialog-title"><form id="preview-form"><header><h2 id="dialog-title">Create profile</h2><button type="button" id="dialog-close" aria-label="Close">×</button></header><label id="name-label" for="preview-name">Profile name</label><input id="preview-name" maxlength="60" autocomplete="off" placeholder="e.g. Gaming" required><p id="dialog-hint">Give this channel or creative space its own projects.</p><div class="dialog-actions"><button type="button" class="secondary" id="dialog-cancel">Cancel</button><button class="primary" type="submit" id="dialog-submit">Create profile</button></div></form></dialog>
+</body></html>

@@ -12,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 class HomeRoutes(unittest.TestCase):
     def test_home_editor_and_local_assets_are_separate_routes(self):
         for path, filename, content_type in (
-            ('/', 'home.html', 'text/html; charset=utf-8'),
+            ('/', 'studio.html', 'text/html; charset=utf-8'),
+            ('/studio.js', 'studio.js', 'text/javascript'),
+            ('/studio.css', 'studio.css', 'text/css'),
             ('/editor', 'index.html', 'text/html; charset=utf-8'),
             ('/home.css', 'home.css', 'text/css'),
             ('/home.js', 'home.js', 'text/javascript'),

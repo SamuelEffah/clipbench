@@ -45,8 +45,15 @@ function paintListen() {
 }
 
 async function refreshUnheard() {
+  const project = projectQuery();
+  if (dialogue.project !== project) {
+    dialogue = {...dialogue, project, results: [], videos: 0, unheard: [], busy: false};
+    paintListen();
+    if (typeof paintDialogue === "function") paintDialogue();
+  }
   try {
-    const got = await api(`/api/dialogue?q=${projectQuery().replace(/^\?/, "&")}`);
+    const got = await api(`/api/dialogue?q=${project.replace(/^\?/, "&")}`);
+    if (project !== projectQuery()) return;
     dialogue = {...dialogue, videos: got.videos, unheard: got.unheard || []};
   } catch (err) { return; }
   paintListen();
@@ -160,4 +167,4 @@ $("dclear").onclick = () => {
   paintDialogue();
   $("dq").focus();
 };
-refreshUnheard();
+// Subtitle counts load with refreshLibrary, after the project has been selected.

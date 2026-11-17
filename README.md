@@ -42,7 +42,12 @@ the CPU and takes minutes per video.
 
 1. In Google Cloud Console, enable the YouTube Data API v3 and create an OAuth client of type Desktop app.
 2. Save the downloaded JSON as `workspace/data/youtube_client.json`.
-3. Choose Connect YouTube in the app and authorize your channel.
+3. Select a profile, open the connection icon at the top right, and choose Connect YouTube.
+
+The app opens directly into your projects. Create profiles with the **+** in the sidebar;
+each profile keeps its own projects and YouTube connection. Existing projects and the
+previous connection belong to **Default**. Use the arrow on a project card to move it to
+another profile. Project names remain unique across the app.
 
 The watermark and title card take the channel's name and handle from this connection.
 

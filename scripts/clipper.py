@@ -66,6 +66,7 @@ import voice_isolation
 import instrumental
 from make_short import FONT_IMPACT, FONT_BOLD, FONT_REGULAR, FONT_EMOJI, CAPMODES, HEX_COLOUR, LOOKS, MAX_AUDIO_ITEMS, MAX_WORDS, CAPTION_SIZES, SPLIT_RANGE, probe_duration, DEFAULT_FORMAT, FORMATS, LAYOUTS, RAMPS, SUB_FONT_SIZE, TEMPLATES, LANES, LANE_COUNT, TRANSITIONS, joined_length, out_length
 from publisher import CALLBACK_PATH, Publisher
+from profile_accounts import ProfileAccounts
 from shorts import current_upload, list_shorts, thumbnail, with_stats
 from store import Store
 from thumbnails import ThumbnailStore
@@ -129,6 +130,7 @@ def audio_type(path):
 lock = threading.Lock()
 store = None
 publisher = None
+profile_accounts = None
 video_stats = None
 registry = {}
 proxies = {}
@@ -2003,6 +2005,25 @@ def project_arg(query):
     return name or None
 
 
+def request_profile(query):
+    """Explicit profile for home, project ownership for editor requests; never global active state."""
+    project = project_arg(query)
+    if project and (owned := store.project_profile(project)):
+        return owned
+    profile_id = query.get('profile', ['default'])[0]
+    if profile_id != 'default' and not store.get_profile(profile_id):
+        raise ValueError('Profile not found.')
+    return profile_id
+
+
+def account_for(profile_id='default'):
+    return profile_accounts.publisher(profile_id) if profile_accounts else publisher
+
+
+def project_account(name):
+    return account_for((store.project_profile(name) if store else None) or 'default')
+
+
 def scan_library(project=None):
     """Every video the bench knows, and with a project only the ones it can see: its own and, unless it keeps its own media, the shared ones nobody claimed."""
     found = {}
@@ -2435,7 +2456,7 @@ def render_flags(project):
     if project.get("normalize"):
         flags.append("--normalize")
     # The watermark and the title card name the connected YouTube channel; with none known they stay blank.
-    channel = publisher.channel() if publisher else {}
+    channel = project_account(project.get('name')).channel() if publisher else {}
     if not isinstance(channel, dict):
         channel = {}
     if project.get("watermark", True) and channel.get("handle"):
@@ -2806,7 +2827,12 @@ class Handler(BaseHTTPRequestHandler):
         path = unquote(urlparse(self.path).path)
         if path == "/avatar.png" and AVATAR_FILE.is_file():
             return self.serve_file(AVATAR_FILE, "image/png")
-        static = {"/": ("home.html", "text/html; charset=utf-8"),
+        static = {"/": ("studio.html", "text/html; charset=utf-8"),
+                  "/studio.js": ("studio.js", "text/javascript"),
+                  "/studio.css": ("studio.css", "text/css"),
+                  "/profiles-preview": ("profiles-preview.html", "text/html; charset=utf-8"),
+                  "/profiles-preview.css": ("profiles-preview.css", "text/css"),
+                  "/profiles-preview.js": ("profiles-preview.js", "text/javascript"),
                   "/editor": ("index.html", "text/html; charset=utf-8"),
                   "/home.css": ("home.css", "text/css"),
                   "/home.js": ("home.js", "text/javascript"),
@@ -2891,34 +2917,71 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as err:
                 return self.send_json({"error": str(err)}, 400)
         if path == "/api/projects":
+            query = parse_qs(urlparse(self.path).query)
+            if 'profile' in query or 'project' in query:
+                try:
+                    return self.send_json(store.list_projects(request_profile(query)))
+                except ValueError as err:
+                    return self.send_json({'error': str(err)}, 400)
             return self.send_json(store.list_projects())
+        if path == '/api/profiles':
+            profiles = store.list_profiles()
+            for profile in profiles:
+                settings = account_for(profile['id']).store
+                tokens = settings.get_setting(yt.TOKEN_KEY) or {}
+                profile['connected'] = bool(tokens.get('refresh_token'))
+                profile['channel'] = settings.get_setting(yt.CHANNEL_KEY) or {}
+                profile['defaults'] = store.profile_defaults(profile['id'])
+            return self.send_json(profiles)
         if m := re.fullmatch(r"/api/project/([A-Za-z0-9_-]+)", path):
             project = store.get_project(m.group(1))
-            return self.send_json(project) if project is not None else self.send_json({}, 404)
+            return self.send_json({**project, 'profile_id': store.project_profile(m.group(1))}) if project is not None else self.send_json({}, 404)
         if m := re.fullmatch(r"/api/rendered-project/([A-Za-z0-9_-]+)", path):
             snap = rendered_project(m.group(1))
             return self.send_json(snap) if snap is not None else self.send_json({}, 404)
         if path == "/api/home-recent":
-            recent = store.recent_projects(None if parse_qs(urlparse(self.path).query).get("all") == ["1"] else 3)
+            query = parse_qs(urlparse(self.path).query)
+            try:
+                profile_id = request_profile(query) if 'profile' in query else None
+            except ValueError as err:
+                return self.send_json({'error': str(err)}, 400)
+            recent = store.recent_projects(None if query.get("all") == ["1"] else 3, profile_id)
             for item in recent:
                 src = item.pop("src", None)
                 vid = video_id(src) if src else None
-                if not item["thumb"] and vid in registry:
-                    item["thumb"] = f"/video-thumb/{vid}.jpg"
+                if not item["thumb"] and src:
+                    source = Path(src)
+                    if source.suffix.lower() in VIDEO_EXTS and source.is_file():
+                        with lock:
+                            registry[vid] = source
+                        item["thumb"] = f"/video-thumb/{vid}.jpg"
             return self.send_json(recent)
         if path == "/api/home-project":
             preferred = parse_qs(urlparse(self.path).query).get("name", [None])[0]
             return self.send_json(store.home_project(preferred))
         if path == "/api/youtube":
-            return self.send_json({**publisher.status(), "best_time": best_time_text(video_stats.best_day())})
+            try:
+                profile_id = request_profile(parse_qs(urlparse(self.path).query))
+                return self.send_json({**account_for(profile_id).status(), "best_time": best_time_text(video_stats.best_day()) if profile_id == 'default' else ''})
+            except ValueError as err:
+                return self.send_json({'error': str(err)}, 400)
         if path == "/api/uploads/progress":
             names = list(dict.fromkeys(parse_qs(urlparse(self.path).query).get("name", [])))
             if any(not PROJECT_NAME.fullmatch(name) for name in names):
                 return self.send_json({"error": "That isn't a project name"}, 400)
-            return self.send_json({name: publisher.state(name) for name in names})
+            return self.send_json({name: project_account(name).state(name) for name in names})
         if path == "/api/shorts":
-            video_stats.refresh_soon()
-            return self.send_json(with_stats(list_shorts(SHORT_DIR, store.list_projects(), publisher.state, short_duration), store.video_stats()))
+            query = parse_qs(urlparse(self.path).query)
+            try:
+                profile_id = request_profile(query) if 'project' in query or 'profile' in query else None
+            except ValueError as err:
+                return self.send_json({'error': str(err)}, 400)
+            if profile_id in (None, 'default'):
+                video_stats.refresh_soon()
+            shorts = list_shorts(SHORT_DIR, store.list_projects(profile_id), lambda name: project_account(name).state(name), short_duration)
+            if profile_id is not None:
+                shorts = [row for row in shorts if (store.project_profile(row['name']) or 'default') == profile_id]
+            return self.send_json(with_stats(shorts, store.video_stats()))
         if path == "/api/video-stats":
             return self.send_json(video_stats.status())
         if m := re.fullmatch(r"/clip-thumb/([0-9a-f]{64})\.(jpg|png|webp)", path):
@@ -2932,13 +2995,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.serve_file(thumb, "image/jpeg") if thumb else self.send_error(404)
         if path == CALLBACK_PATH:
             try:
-                publisher.finish_connect(self.server.server_address[1], parse_qs(urlparse(self.path).query))
+                (profile_accounts.callback if profile_accounts else publisher.finish_connect)(self.server.server_address[1], parse_qs(urlparse(self.path).query))
             except yt.YouTubeError as err:
                 return self.send_html(f"<h3>Not connected</h3><p>{html.escape(str(err))}</p>", 400)
             return self.send_html("<h3>YouTube connected</h3><p>You can close this tab and go back to the clip bench.</p>")
         if m := re.fullmatch(r"/api/upload/([A-Za-z0-9_-]+)", path):
             video = short_folder(m.group(1)) / "video.mp4"
-            state = publisher.state(m.group(1))
+            state = project_account(m.group(1)).state(m.group(1))
             return self.send_json(current_upload(state, video.stat().st_mtime) if video.is_file() else state)
         if m := re.fullmatch(r"/api/proxy/([0-9a-f]{12})", path):
             return self.send_json(proxy_status(m.group(1), wait=parse_qs(urlparse(self.path).query).get("wait") == ["1"]))
@@ -3074,16 +3137,57 @@ class Handler(BaseHTTPRequestHandler):
             if not (PROJECT_NAME.fullmatch(source) and PROJECT_NAME.fullmatch(target)):
                 return self.send_json({"error": "That isn't a project name"}, 400)
             store.copy_assets(source, target)
+            if owned := store.project_profile(source):
+                store.move_project(target, owned)
             return self.send_json({"ok": True})
+        if path in ("/api/project-rename", "/api/project-duplicate"):
+            source, target = str(body.get("from", "")), str(body.get("to", "")).strip()
+            if not (PROJECT_NAME.fullmatch(source) and PROJECT_NAME.fullmatch(target)):
+                return self.send_json({"error": "Use letters, numbers, dashes or underscores (up to 60 characters)."}, 400)
+            try:
+                store.manage_project(source, target, duplicate=path.endswith("duplicate"))
+            except ValueError as err:
+                return self.send_json({"error": str(err)}, 400)
+            return self.send_json({"name": target})
         if path == "/api/project-create":
             name = str(body.get("name", "")).strip()
             if not PROJECT_NAME.fullmatch(name):
                 return self.send_json({"error": "Use letters, numbers, dashes or underscores (up to 60 characters)."}, 400)
             project = {"name": name, "clips": [], "bank": [], "audio": [], "format": "9:16", "template": "full", "layout": "title", "watermark": True}
-            if not store.create_project(name, project):
+            try:
+                profile_id = str(body.get('profile') or 'default')
+                project.update(store.profile_defaults(profile_id))
+                created = store.create_project(name, project, profile_id)
+            except ValueError as err:
+                return self.send_json({'error': str(err)}, 400)
+            if not created:
                 return self.send_json({"error": "A project with this name already exists."}, 409)
             store.mark_own_media(name)
             return self.send_json({"name": name})
+        if path in ('/api/profile-settings', '/api/profile-delete'):
+            profile_id = str(body.get('id') or '')
+            try:
+                if path.endswith('delete'):
+                    store.delete_profile(profile_id)
+                    if profile_accounts:
+                        with profile_accounts.lock:
+                            profile_accounts.publishers.pop(profile_id, None)
+                else:
+                    store.update_profile(profile_id, str(body.get('name') or ''), body.get('defaults'))
+                return self.send_json({'ok': True})
+            except ValueError as err:
+                return self.send_json({'error': str(err)}, 400)
+        if path == '/api/profiles':
+            try:
+                return self.send_json(store.create_profile(str(body.get('name') or '')))
+            except ValueError as err:
+                return self.send_json({'error': str(err)}, 400)
+        if path == '/api/project-profile':
+            try:
+                store.move_project(str(body.get('name') or ''), str(body.get('profile') or ''))
+                return self.send_json({'ok': True})
+            except ValueError as err:
+                return self.send_json({'error': str(err)}, 400)
         if path == "/api/project-delete":
             name = str(body.get("name", ""))
             if not PROJECT_NAME.fullmatch(name):
@@ -3243,16 +3347,20 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(start_download(url, section, live_wall, str(body.get("title", ""))[:200], project or None))
         if path == "/api/youtube/connect":
             try:
-                return self.send_json({"url": publisher.begin_connect(self.server.server_address[1])})
-            except yt.YouTubeError as err:
+                account = account_for(request_profile(parse_qs(urlparse(self.path).query)))
+                return self.send_json({"url": account.begin_connect(self.server.server_address[1])})
+            except (yt.YouTubeError, ValueError) as err:
                 return self.send_json({"error": str(err)}, 400)
         if path == "/api/youtube/disconnect":
-            publisher.disconnect()
+            try:
+                account_for(request_profile(parse_qs(urlparse(self.path).query))).disconnect()
+            except ValueError as err:
+                return self.send_json({'error': str(err)}, 400)
             return self.send_json({"ok": True})
         if m := re.fullmatch(r"/api/upload/([A-Za-z0-9_-]+)", path):
             info = read_publish(m.group(1))
             try:
-                return self.send_json(publisher.start_upload(m.group(1), short_folder(m.group(1)) / "video.mp4",
+                return self.send_json(project_account(m.group(1)).start_upload(m.group(1), short_folder(m.group(1)) / "video.mp4",
                                                              info["title"], info["description"]))
             except yt.YouTubeAuthError as err:
                 return self.send_json({"error": str(err), "reconnect": True}, 401)
@@ -3309,14 +3417,25 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/project/([A-Za-z0-9_-]+)", urlparse(self.path).path)
         if not m or not isinstance(body, dict):
             return self.send_json({"error": "bad request"}, 400)
+        query = parse_qs(urlparse(self.path).query)
+        owned = store.project_profile(m.group(1))
+        if owned and query.get('profile') and query['profile'][0] != owned:
+            return self.send_json({'error': 'This project name belongs to another profile. Choose another name or reopen the project.'}, 409)
         try:
             body, thumbs = ThumbnailStore(CLIP_THUMB_DIR).externalize(body)
         except OSError:
             thumbs = []
         fresh = store.get_project(m.group(1)) is None
-        store.put_project(m.group(1), body)
         if fresh:
+            try:
+                profile_id = request_profile(query)
+                if not store.create_project(m.group(1), body, profile_id):
+                    return self.send_json({'error': 'A project with this name already exists.'}, 409)
+            except ValueError as err:
+                return self.send_json({'error': str(err)}, 400)
             store.mark_own_media(m.group(1))
+        else:
+            store.put_project(m.group(1), body)
         store.claim_used_videos(body, m.group(1))
         self.send_json({"ok": True, **({"thumbs": thumbs} if thumbs else {})})
 
@@ -3331,12 +3450,13 @@ def main():
     log.info("starting %s on port %s, python %s", ROOT, a.port, sys.version.split()[0])
     if not (UI_DIR / "index.html").is_file():
         sys.exit(f"missing UI: {UI_DIR / 'index.html'}")
-    global store, publisher, video_stats
+    global store, publisher, video_stats, profile_accounts
     store = Store(DB_FILE)
     imported = store.import_legacy(PROJECT_DIR)
     if imported:
         print(f"Moved {imported} project{'s' if imported != 1 else ''} into {DB_FILE} (the old files are untouched)")
     publisher = Publisher(store, CLIENT_FILE)
+    profile_accounts = ProfileAccounts(store, CLIENT_FILE, publisher)
     video_stats = VideoStats(store, CLIENT_FILE)
     store.claim_used_videos()
     store.mark_existing_projects_own_media()

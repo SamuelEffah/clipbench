@@ -8,7 +8,7 @@ from pathlib import Path
 class DialogueRequestCoalescingTests(unittest.TestCase):
     def test_only_newest_waiting_query_runs_and_clear_discards_pending(self):
         source = (Path(__file__).resolve().parents[1] / 'scripts/clipper_ui/dialogue.js').read_text()
-        source = source[source.index('let dialoguePending'):source.index('refreshUnheard();', source.index('let dialoguePending'))]
+        source = source[source.index('let dialoguePending'):]
         script = r'''
 const assert = require('node:assert/strict');
 let dialogue={q:'first',results:[],busy:false}, dialogueSeq=0, dialogueTimer=0, project='one';
@@ -69,3 +69,23 @@ const api=async url=>{calls.push(url);return {videos:0,unheard:[]};};
 '''
         result = subprocess.run(['node', '-e', script], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_slow_startup_count_cannot_overwrite_empty_project(self):
+        source = (Path(__file__).resolve().parents[1] / 'scripts/clipper_ui/dialogue.js').read_text()
+        source = source[source.index('async function refreshUnheard'):source.index('async function listenToAll')]
+        script = r'''
+const assert=require('node:assert/strict');
+let project='untitled',dialogue={videos:0,unheard:[]};
+const projectQuery=()=>'?project='+project,paintListen=()=>{};
+const pending=[];const api=()=>new Promise(resolve=>pending.push(resolve));
+''' + source + r'''
+(async()=>{
+ const startup=refreshUnheard();
+ project='fasdf';const current=refreshUnheard();
+ pending[1]({videos:0,unheard:[]});await current;
+ pending[0]({videos:13,unheard:Array.from({length:8},(_,id)=>({id}))});await startup;
+ assert.equal(dialogue.unheard.length,0,'stale startup response must not show eight unrelated videos');
+})().catch(e=>{console.error(e);process.exit(1);});
+'''
+        result = subprocess.run(['node','-e',script],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)

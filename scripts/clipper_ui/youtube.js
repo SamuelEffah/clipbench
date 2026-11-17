@@ -49,7 +49,7 @@ async function ytRefresh() {
   yt.refreshing = request;
   request.promise = (async () => {
     try {
-      const [status, upload] = await Promise.all([api("/api/youtube"), api(`/api/upload/${name}`)]);
+      const [status, upload] = await Promise.all([api("/api/youtube?project=" + encodeURIComponent(publishName)), api(`/api/upload/${name}`)]);
       if (name !== publishName) return;
       yt.status = status;
       yt.upload = upload;
@@ -73,7 +73,7 @@ document.addEventListener("visibilitychange", () => {
 
 async function ytConnect() {
   try {
-    const {url} = await api("/api/youtube/connect", "POST", {});
+    const {url} = await api("/api/youtube/connect?project=" + encodeURIComponent(publishName), "POST", {});
     const win = window.open(url, "_blank");
     ytEl("ytStatus").textContent = win ? "Finish signing in with Google in the new tab." : "";
     if (!win) {
@@ -82,7 +82,7 @@ async function ytConnect() {
     const started = Date.now(), id = ++yt.connecting;
     while (id === yt.connecting && Date.now() - started < 180000) {
       await new Promise(r => setTimeout(r, 1500));
-      const status = await api("/api/youtube").catch(() => null);
+      const status = await api("/api/youtube?project=" + encodeURIComponent(publishName)).catch(() => null);
       if (status && status.connected) {
         yt.status = status;
         ytPaint();
@@ -111,7 +111,7 @@ async function ytUpload() {
 
 ytEl("ytAction").onclick = () => (yt.status && yt.status.connected ? ytUpload() : ytConnect());
 const ytDisconnect = async () => {
-  await api("/api/youtube/disconnect", "POST", {}).catch(err => toast(err.message));
+  await api("/api/youtube/disconnect?project=" + encodeURIComponent(publishName), "POST", {}).catch(err => toast(err.message));
   ytRefresh();
 };
 ytEl("ytDisc").onclick = ytDisconnect;
