@@ -96,7 +96,7 @@ function foldStreamers(folded) {
   try { localStorage.setItem(FOLD_KEY, folded ? "1" : "0"); } catch { /* the choice just isn't remembered */ }
 }
 $("streamerFold").onclick = () => foldStreamers(!$("streamers").classList.contains("folded"));
-try { foldStreamers(localStorage.getItem(FOLD_KEY) === "1"); } catch { /* start open */ }
+try { foldStreamers(localStorage.getItem(FOLD_KEY) !== "0"); } catch { /* retain the markup default */ }
 
 // Always in the sources panel. Checks run while the page is visible, and again when you come back to it.
 function startStreamers() {

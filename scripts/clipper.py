@@ -30,7 +30,7 @@ import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from concurrent.futures import Future
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from copy import deepcopy
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -2341,6 +2341,10 @@ def prune_cuts():
 
 
 proxy_finished = threading.Condition()
+# Browser previews compete with playback for CPU and disk bandwidth. Keep one
+# converter and a FIFO of lightweight jobs instead of a waiting thread per video.
+proxy_pending = deque()
+proxy_worker_running = False
 
 
 def set_proxy_status(vid, state):
@@ -2359,6 +2363,7 @@ def proxy_status(vid, wait=False):
 
 
 def start_proxy(vid):
+    global proxy_worker_running
     path = registry.get(vid)
     if not path:
         return {"state": "error", "message": "unknown video"}
@@ -2369,9 +2374,34 @@ def start_proxy(vid):
         if proxy_path(vid).is_file():
             proxies[vid] = {"state": "ready", "pct": 100}
             return proxies[vid]
-        proxies[vid] = {"state": "working", "pct": 0}
-    threading.Thread(target=run_proxy, args=(vid, path), daemon=True).start()
-    return proxies[vid]
+        proxies[vid] = {"state": "working", "pct": 0, "queued": True}
+        proxy_pending.append((vid, path))
+        start_worker = not proxy_worker_running
+        proxy_worker_running = True
+        status = dict(proxies[vid])
+    if start_worker:
+        threading.Thread(target=run_proxy_queue, daemon=True).start()
+    return status
+
+
+def run_proxy_queue():
+    global proxy_worker_running
+    while True:
+        with lock:
+            if not proxy_pending:
+                proxy_worker_running = False
+                return
+            vid, path = proxy_pending.popleft()
+        set_proxy_status(vid, {"state": "working", "pct": 0})
+        try:
+            run_proxy(vid, path)
+        except Exception:
+            log.exception("proxy preparation failed for %s", vid)
+            try:
+                (PROXY_DIR / f"{vid}.part.mp4").unlink(missing_ok=True)
+            except OSError:
+                log.warning("couldn't remove partial proxy for %s", vid)
+            set_proxy_status(vid, {"state": "error", "pct": 0, "message": "Couldn't prepare this preview. Try again"})
 
 
 def run_proxy(vid, path):
@@ -2389,25 +2419,41 @@ def run_proxy(vid, path):
     attempts = [["-c", "copy"], encode] if compatible else [encode]
     for options in attempts:
         cmd = base + options + ["-movflags", "+faststart", str(tmp)]
-        try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        except OSError as err:
-            set_proxy_status(vid, {"state": "error", "pct": 0, "message": f"Couldn't start ffmpeg: {err}"})
-            return
-        for line in proc.stdout:
-            if line.startswith("out_time_ms=") and meta["duration"]:
+        # Progress is read from stdout. A file for stderr avoids a full error
+        # pipe deadlocking the sole converter while stdout waits for completion.
+        with tempfile.TemporaryFile() as errors:
+            try:
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=errors, text=True)
+            except OSError as err:
+                set_proxy_status(vid, {"state": "error", "pct": 0, "message": f"Couldn't start ffmpeg: {err}"})
+                return
+            try:
+                for line in proc.stdout:
+                    if line.startswith("out_time_ms=") and meta["duration"]:
+                        try:
+                            done = int(line.split("=")[1]) / 1_000_000
+                        except ValueError:
+                            continue
+                        set_proxy_status(vid, {"state": "working", "pct": min(99, round(done / meta["duration"] * 100))})
+                result = proc.wait()
+            finally:
                 try:
-                    done = int(line.split("=")[1]) / 1_000_000
-                except ValueError:
-                    continue
-                set_proxy_status(vid, {"state": "working", "pct": min(99, round(done / meta["duration"] * 100))})
-        err = proc.stderr.read()
-        proc.stdout.close()
-        proc.stderr.close()
-        if proc.wait() == 0:
-            tmp.replace(proxy_path(vid))
-            set_proxy_status(vid, {"state": "ready", "pct": 100})
-            return
+                    if proc.poll() is None:
+                        proc.terminate()
+                        try:
+                            proc.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            proc.kill()
+                            proc.wait()
+                finally:
+                    proc.stdout.close()
+            errors.seek(0, os.SEEK_END)
+            errors.seek(max(0, errors.tell() - 4096))
+            err = errors.read().decode("utf-8", errors="replace")
+            if result == 0:
+                tmp.replace(proxy_path(vid))
+                set_proxy_status(vid, {"state": "ready", "pct": 100})
+                return
         tmp.unlink(missing_ok=True)
     set_proxy_status(vid, {"state": "error", "pct": 0, "message": err.strip()[-300:]})
 

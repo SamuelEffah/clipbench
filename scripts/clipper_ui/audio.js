@@ -419,14 +419,39 @@ function sourceAt(clip, pos) {
 
 function seekShort(T) {
   const clips = state.project.clips;
-  let idx = -1, at = 0, start = 0, prev = null;
-  clips.forEach((c, n) => {
-    if (!isTop(c)) return;
-    at -= seamOverlap(prev, c);
-    if (at <= T + 0.0001) { idx = n; start = at; }
-    at += outLen(c);
-    prev = c;
-  });
+  // Pointer moves share the same timing until an edit or clip-list change.
+  // Keep just the current index so switching projects releases old clip arrays.
+  const version = typeof editCount === "number" ? editCount : 0;
+  let timing = seekShort.timing;
+  if (!timing || timing.clips !== clips || timing.version !== version || timing.length !== clips.length) {
+    const rows = [];
+    let at = 0, prev = null, ordered = true, previousStart = -Infinity;
+    clips.forEach((c, idx) => {
+      if (!isTop(c)) return;
+      at -= seamOverlap(prev, c);
+      if (!Number.isFinite(at) || at < previousStart) ordered = false;
+      rows.push({idx, start: at});
+      previousStart = at;
+      at += outLen(c);
+      prev = c;
+    });
+    timing = seekShort.timing = {clips, version, length: clips.length, rows, ordered};
+  }
+  const rows = timing.rows, target = T + 0.0001;
+  let row;
+  if (timing.ordered) {
+    let lo = 0, hi = rows.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (rows[mid].start <= target) lo = mid + 1;
+      else hi = mid;
+    }
+    row = rows[lo - 1];
+  } else {
+    // Preserve the original last-matching rule for malformed imported timings.
+    for (const candidate of rows) if (candidate.start <= target) row = candidate;
+  }
+  const idx = row ? row.idx : -1, start = row ? row.start : 0;
   if (idx < 0) return;
   const clip = clips[idx], pos = Math.max(0, T - start);
   const src = sourceAt(clip, Math.min(pos, movingLen(clip)));

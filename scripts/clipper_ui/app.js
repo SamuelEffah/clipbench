@@ -180,10 +180,33 @@ async function api(path, method = "GET", body) {
     const query = new URLSearchParams({project: requestedProject || state.project.name, profile: profile || 'default'});
     path += (path.includes('?') ? '&' : '?') + query;
   }
-  const res = await fetch(path, {method, headers: body ? {"Content-Type": "application/json"} : {}, body: body ? JSON.stringify(body) : undefined});
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || data.message || res.statusText);
-  return data;
+  // Share only concurrent reads, scoped by the full project/profile URL. No
+  // response cache: polling and subsequent library reads always stay fresh.
+  const reads = api.reads || (api.reads = new Map());
+  if (method === "GET" && reads.has(path)) return reads.get(path);
+  const request = (async () => {
+    // Job endpoints acknowledge quickly; their work is polled separately. Keep a
+    // deadline through body consumption so a stalled connection cannot lock saves.
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(new TypeError("Request timed out. Please try again")), method === "GET" || method === "PUT" ? 30000 : 120000);
+    try {
+      const res = await fetch(path, {method, signal: controller.signal, headers: body ? {"Content-Type": "application/json"} : {}, body: body ? JSON.stringify(body) : undefined});
+      let data;
+      try { data = await res.json(); }
+      catch (err) {
+        if (controller.signal.aborted) throw controller.signal.reason;
+        throw new Error(res.ok ? "Invalid server response. Please try again" : res.statusText || `Request failed (${res.status})`);
+      }
+      if (!res.ok) throw new Error(data?.error || data?.message || res.statusText);
+      if (data === null || typeof data !== "object") throw new Error("Invalid server response. Please try again");
+      return data;
+    } finally {
+      clearTimeout(deadline);
+      if (method === "GET") reads.delete(path);
+    }
+  })();
+  if (method === "GET") reads.set(path, request);
+  return request;
 }
 
 // Each clip is also saved as its own small file on the server, so playing it never has to seek inside the whole source.
@@ -261,7 +284,7 @@ function changed(keepDom, key = "") {
   recordEdit(key);
   editCount++;
   unsaved = true;
-  $("saved").textContent = "Saving";
+  paintSaveState($("saved"), "saving");
   clearTimeout(saveTimer);
   saveTimer = setTimeout(save, 500);
   if (!keepDom) render();
@@ -278,7 +301,7 @@ function travel(from, to, label) {
   state.sel = Math.min(state.sel, target.clips.length - 1);
   editCount++;
   unsaved = true;
-  $("saved").textContent = "Saving";
+  paintSaveState($("saved"), "saving");
   clearTimeout(saveTimer);
   saveTimer = setTimeout(save, 500);
   render();
@@ -309,6 +332,7 @@ async function save() {
 }
 async function saveOnce() {
   const name = state.project.name, seen = editCount;
+  paintSaveState($("saved"), "saving");
   try {
     const payload = canon();
     const response = await api(`/api/project/${name}`, "PUT", payload);
@@ -338,9 +362,9 @@ function retryNow() {
   retryWait = 2000;
   save();
 }
-// The save pill under the project name: hidden while all is well, a warning while the bench cannot be reached or refuses
-// the save (click it to try again now), and a short green "back" once a save gets through after that.
+// Saving stays visible until completion; success clears after a short confirmation.
 const SAVE_STATES = {
+  saving: {text: "Saving…", cls: "saving", title: "Saving your changes locally"},
   offline: {text: "Offline", cls: "bad", title: "The clip bench can't be reached. Your edits stay here and save when it's back. Click to try now"},
   failed: {text: "Not saved", cls: "bad", title: "The bench refused the save. Click to try now"},
   back: {text: "Saved", cls: "good", title: ""},
@@ -349,15 +373,21 @@ const SAVE_STATES = {
 const BACK_FOR = 3000;
 let backTimer = 0;
 function paintSaveState(el, kind, retry) {
-  const has = c => String(el.className || "").split(" ").includes(c);
-  const shown = kind === "saved" && has("bad") ? "back" : kind;
+  const shown = kind;
   const {text, cls, title} = SAVE_STATES[shown];
-  el.textContent = text;
-  el.title = title;
-  el.className = `saved${cls ? ` ${cls}` : ""}`;
-  el.onclick = cls === "bad" ? retry : null;
+  const elements = typeof document === "undefined" ? [el] : [...document.querySelectorAll(".save-status")];
+  for (const item of elements) {
+    item.textContent = text;
+    item.title = title;
+    item.className = `saved save-status${cls ? ` ${cls}` : ""}`;
+    item.hidden = false;
+    item.onclick = cls === "bad" ? retry : null;
+    item.disabled = cls !== "bad";
+  }
   clearTimeout(backTimer);
-  if (shown === "back") backTimer = setTimeout(() => { if (has("good")) el.className = "saved"; }, BACK_FOR);
+  if (kind === "saved" || kind === "back") backTimer = setTimeout(() => {
+    for (const item of elements) item.hidden = true;
+  }, BACK_FOR);
   return shown;
 }
 // Save the open project now if it has edits waiting, before another one replaces it.
@@ -378,32 +408,82 @@ function esc(s) {
   return d.innerHTML;
 }
 
+function renderSourceWelcome() {
+  const empty = !state.current && !streaming();
+  document.body.classList.toggle("source-empty", empty);
+}
+
+function sourceRowsSummary(project, library) {
+  const version = typeof editCount === "number" ? editCount : 0;
+  const cached = sourceRowsSummary.cached;
+  if (cached && cached.project === project && cached.library === library && cached.version === version &&
+      cached.libraryLength === library.length && cached.clips === project.clips && cached.clipLength === project.clips.length &&
+      cached.other === project.other && cached.otherLength === (project.other || []).length && cached.hidden === project.hiddenSources) return cached.result;
+  const known = new Set(library.map(v => v.path)), counts = new Map(), missing = new Map(), bankCuts = new Set();
+  for (const [clips, bank] of [[project.clips, true], [project.other || [], false]]) for (const c of clips) {
+    const path = c.src;
+    if (!path) continue;
+    const key = `${path}|${c.in}|${c.out}`;
+    if (!bank && bankCuts.has(key)) continue;
+    if (bank) bankCuts.add(key);
+    counts.set(path, (counts.get(path) || 0) + 1);
+    if (!known.has(path)) {
+      const row = missing.get(path) || {path, name: path.split(/[\\/]/).pop(), thumb: c.thumb || "", count: 0, end: 0};
+      row.count++;
+      row.end = Math.max(row.end, c.out || 0);
+      missing.set(path, row);
+    }
+  }
+  const hidden = new Set(project.hiddenSources || []);
+  const result = {counts, missing: [...missing.values()].filter(v => !hidden.has(v.path))};
+  sourceRowsSummary.cached = {project, library, version, libraryLength: library.length, clips: project.clips,
+    clipLength: project.clips.length, other: project.other, otherLength: (project.other || []).length, hidden: project.hiddenSources, result};
+  return result;
+}
+
+function removeMissingSource(path) {
+  if (state.library.some(v => v.path === path)) return;
+  const hidden = new Set(state.project.hiddenSources || []);
+  if (hidden.has(path)) return;
+  hidden.add(path);
+  state.project = {...state.project, hiddenSources: [...hidden]};
+  changed();
+  toast("Unavailable source removed. Undo to restore");
+}
+
+const sourceDisplayName = name => name.replace(/\.[^.]+$/, "").replace(/_/g, " ");
+
 function renderLibrary() {
+  renderSourceWelcome();
   const box = $("library");
   const sources = sourcesOf();
-  $("tabMedia").innerHTML = `Sources <span class="num count">${sources.length}</span>`;
+  const {counts, missing} = sourceRowsSummary(state.project, state.library);
+  $("tabMedia").innerHTML = `Sources <span class="num count">${sources.length + missing.length + Number(liveRowWanted())}</span>`;
   if ($("mediaPanel").hidden) return;
   box.innerHTML = "";
-  if (!sources.length && !liveRowWanted()) {
+  if (!sources.length && !missing.length && !liveRowWanted()) {
     box.innerHTML = '<div class="empty">No videos yet.</div>';
     return;
-  }
-  const counts = new Map();
-  for (const c of state.project.clips) {
-    const src = c.src;
-    counts.set(src, (counts.get(src) || 0) + 1);
   }
   sources.forEach(v => {
     const n = counts.get(v.path) || 0;
     const el = document.createElement("div");
     el.className = "media";
     el.tabIndex = 0;
-    el.setAttribute("aria-current", state.current && state.current.id === v.id);
-    el.innerHTML = `<div class="thumb"><img src="/video-thumb/${v.id}.jpg" alt="" loading="lazy" onerror="this.remove()"></div><div><b>${esc(v.name)}</b><small class="num">${fmt(v.duration)}, ${n} clip${n === 1 ? "" : "s"}</small></div>` +
+    el.setAttribute("aria-current", !streaming() && state.current && state.current.id === v.id);
+    el.innerHTML = `<div class="thumb"><img src="/video-thumb/${v.id}.jpg" alt="" loading="lazy" onerror="this.remove()"></div><div class="source-copy"><b title="${esc(v.name)}">${esc(sourceDisplayName(v.name))}</b><small class="source-meta num"><span>${fmt(v.duration)}</span><span>${n} clip${n === 1 ? "" : "s"}</span></small></div>` +
       `<button class="mediadel" aria-label="Remove ${esc(v.name)}" title="${v.remove === "unlist" ? "Remove from the list" : "Move to the Trash"}"><svg class="i"><use href="#trash"/></svg></button>`;
     el.querySelector(".mediadel").onclick = e => { e.stopPropagation(); askRemoveVideo(v); };
     el.onclick = () => openVideo(v);
-    el.onkeydown = e => { if (e.key === "Enter") openVideo(v); };
+    el.onkeydown = e => { if (e.target === el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openVideo(v); } };
+    box.appendChild(el);
+  });
+  missing.forEach(v => {
+    const el = document.createElement("div");
+    el.className = "media source-missing";
+    el.innerHTML = `<div class="thumb">${v.thumb ? `<img src="${esc(v.thumb)}" alt="" loading="lazy" onerror="this.remove()">` : '<svg class="i"><use href="#r-clips"/></svg>'}</div><div class="source-copy"><b title="${esc(v.name)}">${esc(sourceDisplayName(v.name))}</b><small class="source-meta"><span>Source unavailable</span><span class="num">${v.count} clip${v.count === 1 ? "" : "s"}</span></small><button type="button" class="source-locate" aria-label="Locate ${esc(v.name)}">Locate file</button></div><button type="button" class="mediadel" aria-label="Remove unavailable ${esc(v.name)}" title="Remove from Sources; keep saved clips"><svg class="i" aria-hidden="true"><use href="#trash"/></svg></button>`;
+    el.querySelector(".source-locate").onclick = () => locateSource(v);
+    el.querySelector(".mediadel").onclick = () => removeMissingSource(v.path);
     box.appendChild(el);
   });
   if (liveRowWanted()) box.appendChild(liveSourceRow());
@@ -413,14 +493,15 @@ function renderLibrary() {
 const liveRowWanted = () => typeof live !== "undefined" && (streaming() || Boolean(live.resume));
 function liveSourceRow() {
   const el = document.createElement("div");
-  el.className = "media";
+  el.className = "media source-stream";
   el.tabIndex = 0;
   el.setAttribute("aria-current", streaming());
   const name = streaming() ? $("srcName").textContent : "Live stream";
-  el.innerHTML = `<div class="thumb live"></div><div><b>${esc(name)}</b><small class="num"><span class="livetag">${live.isLive || !streaming() ? "Live" : "Recording"}</span>, ${live.kind === "twitch" ? "Twitch" : "YouTube"}</small></div>`;
+  const status = !streaming() ? "Resume stream" : live.isLive ? "Live" : "Video";
+  el.innerHTML = `<div class="thumb live"><svg class="i" aria-hidden="true"><use href="#live"/></svg></div><div class="source-copy"><b title="${esc(name)}">${esc(name)}</b><small class="source-meta"><span class="livetag${streaming() ? " is-live" : ""}">${status}</span><span>${live.kind === "twitch" ? "Twitch" : "YouTube"}</span></small></div>`;
   const open = () => { if (!streaming()) backToStream(); };
   el.onclick = open;
-  el.onkeydown = e => { if (e.key === "Enter") open(); };
+  el.onkeydown = e => { if (e.target === el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } };
   return el;
 }
 
@@ -461,6 +542,7 @@ $("rmGo").onclick = () => {
 function dropVideo() {
   for (const el of videos) { el.pause(); el.removeAttribute("src"); el.load(); }
   state.current = null;
+  renderSourceWelcome();
   state.clipStop = null;
   $("srcName").textContent = "No video selected";
   $("srcMeta").textContent = "";
@@ -802,6 +884,7 @@ function renderTimeline() {
   ph.onpointerdown = scrubClip;
   strip.appendChild(ph);
   placePlayhead();
+  if (typeof paintSuggestionRange === "function") paintSuggestionRange();
   drawWave();
 }
 
@@ -1039,9 +1122,9 @@ function renderTray() {
     d.querySelector('[data-act="fav"]').onclick = e => { e.stopPropagation(); toggleFavorite(i); };
     d.querySelector('[data-act="dup"]').onclick = e => { e.stopPropagation(); duplicateClip(i); };
     d.querySelector('[data-act="del"]').onclick = e => { e.stopPropagation(); removeClip(i); };
-    d.onclick = () => select(i);
+    d.onclick = () => select(i, true);
     d.onkeydown = e => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(i); }
+      if (e.target === d && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); select(i, true); }
       if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); move(i, i + (e.key === "ArrowUp" ? -1 : 1)); }
     };
     d.ondragstart = e => { e.dataTransfer.setData(TRAY_MIME, String(i)); e.dataTransfer.effectAllowed = "move"; };
@@ -1331,15 +1414,23 @@ function render() {
   renderShortOptions();
   renderFavs();
   renderShortMode();
+  paintRenderProgress();
   if (typeof ensureVoices === "function") ensureVoices();
 }
 
-function select(i) {
+function select(i, seekToStart = false) {
   state.sel = i;
   const c = state.project.clips[i];
   const v = c && byPath(c.src);
+  if (seekToStart && v) state.clipStop = null;
   if (v && (!state.current || state.current.id !== v.id)) openVideo(v, c.in);
-  else if (c) ensureVisible(c.in, c.out);
+  else if (c) {
+    ensureVisible(c.in, c.out);
+    if (seekToStart && v) {
+      video.currentTime = c.in;
+      updateTime();
+    }
+  }
   render();
 }
 
@@ -1374,7 +1465,7 @@ async function openVideo(v, seekTo = 0) {
     try {
       let st = await api(`/api/proxy/${v.id}`, "POST");
       while (st.state === "working") {
-        showOverlay(`Preparing preview, ${st.pct}%`, st.pct);
+        showOverlay(st.queued ? "Waiting for another preview to finish" : `Preparing preview, ${st.pct}%`, st.pct);
         if (token !== loadToken) return;
         st = await api(`/api/proxy/${v.id}?wait=1`);
       }
@@ -2431,8 +2522,10 @@ function paintRenderProgress() {
   const pct = renderJob ? renderJob.pct : null, btn = $("renderBtn"), rail = $("railShorts");
   rail.setAttribute("aria-label", renderJob ? `Your Shorts, rendering ${pct}%` : "Your Shorts");
   rail.dataset.tip = renderJob ? `Rendering ${renderJob.name}, ${pct}%` : "Your Shorts";
-  btn.disabled = Boolean(renderJob);
-  btn.querySelector("span").textContent = renderJob ? `Rendering ${pct}%` : "Push to render";
+  const hasClips = canon().clips.length > 0;
+  btn.disabled = Boolean(renderJob) || !hasClips;
+  btn.title = renderJob ? `Rendering ${pct}%` : hasClips ? "Export this Short in the background" : "Add a clip to the Short before exporting";
+  btn.querySelector("span").textContent = renderJob ? `Rendering ${pct}%` : "Export Short";
   paintShortsBadge();
 }
 
@@ -2490,7 +2583,7 @@ async function loadProject(name) {
     try { localStorage.setItem('clipbench.profile', state.profileId); } catch {}
     if (preview.on) closePreview();
     video.pause();
-    const stored = {name: clean, hook: data.hook || "", frame: data.frame || "auto", layout: data.layout || "title", format: data.format || "9:16", template: data.template || "full", capSize: data.capSize || 0, normalize: Boolean(data.normalize), watermark: data.watermark !== false, blurBg: Boolean(data.blurBg), fade: data.fade || 0, audio: data.audio || [], clips: data.clips || [], bank: data.bank || (data.clips || []).map(c => ({...c}))};
+    const stored = {name: clean, hiddenSources: Array.isArray(data.hiddenSources) ? data.hiddenSources.filter(path => typeof path === "string") : [], hook: data.hook || "", frame: data.frame || "auto", layout: data.layout || "title", format: data.format || "9:16", template: data.template || "full", capSize: data.capSize || 0, normalize: Boolean(data.normalize), watermark: data.watermark !== false, blurBg: Boolean(data.blurBg), fade: data.fade || 0, audio: data.audio || [], clips: data.clips || [], bank: data.bank || (data.clips || []).map(c => ({...c}))};
     state.project = orient(stored, state.mode);
     state.sel = state.project.clips.length ? 0 : -1;
     state.audioSel = null;
@@ -2500,7 +2593,7 @@ async function loadProject(name) {
     rememberProject(clean);
     await loadChannel();
     await restoreEditorSession();
-    $("saved").textContent = "Opened";
+    paintSaveState($("saved"), "saved");
   } catch (err) {
     toast(`Couldn't open ${clean}: ${err.message}`);
   }
@@ -2891,7 +2984,7 @@ async function createProject(name, persist = true) {
   if (persist) await save();
   await loadAssets();
   if (persist) rememberProject(name);
-  $("saved").textContent = "New project";
+  paintSaveState($("saved"), "saved");
   render();
 }
 
@@ -2907,7 +3000,7 @@ async function duplicateProject(source, name) {
     return toast(`Couldn't copy ${source}: ${err.message}`);
   }
   await loadProject(name);
-  $("saved").textContent = "Copied";
+  paintSaveState($("saved"), "saved");
 }
 
 function chooseProject(name) {
@@ -2947,43 +3040,77 @@ window.addEventListener("resize", () => { if (projDlg.open) placeProjects(); });
 projDlg.addEventListener("close", () => { closeCardMenu(); pbox.value = state.project.name; });
 $("addBtn").onclick = () => $("srcPick").click();
 $("srcPick").onchange = e => { dropFiles(Array.from(e.target.files)); e.target.value = ""; };
-let downloading = false;
+let downloading = false, downloadFailed = false;
+function paintDownloadState() {
+  $("dlGo").disabled = downloading;
+  $("dlGo").textContent = downloading ? "Downloading…" : downloadFailed ? "Retry download" : "Download";
+  $("dlUrl").readOnly = downloading;
+  $("dlDlg").setAttribute("aria-busy", String(downloading));
+}
 function showDownload(text, pct, isError) {
   $("dlStatus").textContent = text;
   $("dlStatus").classList.toggle("err", Boolean(isError));
-  $("dlBar").hidden = pct === null;
-  if (pct !== null) $("dlFill").style.width = `${pct}%`;
+  const known = typeof pct === "number" && Number.isFinite(pct);
+  const bar = $("dlBar");
+  bar.hidden = !text || Boolean(isError) || !downloading;
+  bar.classList.toggle("indeterminate", !known);
+  if (known) {
+    const value = Math.max(0, Math.min(100, pct));
+    $("dlFill").style.width = `${value}%`;
+    bar.setAttribute("aria-valuenow", String(Math.round(value)));
+  } else bar.removeAttribute("aria-valuenow");
+  bar.setAttribute("aria-valuetext", text || "Not downloading");
 }
 
 async function startDownload() {
-  const url = $("dlUrl").value.trim();
-  if (!url) return showDownload("Paste a link first", null, true);
+  if (downloading) return;
+  const url = $("dlUrl").value.trim(), project = state.project.name;
+  if (!url) {
+    $("dlUrl").setAttribute("aria-invalid", "true");
+    $("dlUrl").focus();
+    return showDownload("Paste a video link to get started", null, true);
+  }
   downloading = true;
-  $("dlGo").disabled = true;
-  showDownload("Starting", 0);
+  downloadFailed = false;
+  paintDownloadState();
+  showDownload("Preparing the download…", null);
   try {
-    let job = await api("/api/download", "POST", {url, project: state.project.name});
+    let job = await api("/api/download", "POST", {url, project});
     while (job.state === "working") {
-      showDownload(`${job.message}${job.pct ? `, ${job.pct}%` : ""}`, job.pct);
+      const pct = typeof job.pct === "number" ? job.pct : null;
+      const message = job.message || "Downloading video";
+      showDownload(`${message}${pct !== null ? ` · ${Math.round(pct)}%` : ""}`, pct);
       await new Promise(r => setTimeout(r, 800));
       job = await api(`/api/download/${job.id}`);
     }
-    if (job.state !== "done") throw new Error(job.message || "The download failed");
-    await refreshLibrary();
-    const v = state.library.find(x => x.path === job.file);
+    if (job.state !== "done") throw new Error(job.message || "The download failed. Check the link and try again");
+    if (state.project.name === project) {
+      showDownload("Opening the video…", 100);
+      await refreshLibrary();
+      const v = state.library.find(x => x.path === job.file);
+      if (v) openVideo(v);
+    }
     $("dlDlg").close();
     $("dlUrl").value = "";
     showDownload("", null);
-    if (v) openVideo(v);
-    toast("Download finished");
+    toast(state.project.name === project ? "Download finished" : `Download finished in ${project}`);
   } catch (err) {
-    showDownload(err.message, null, true);
+    downloadFailed = true;
+    showDownload(err.message || "Couldn't download this video. Check the link and try again", null, true);
   } finally {
     downloading = false;
-    $("dlGo").disabled = false;
+    paintDownloadState();
   }
 }
 $("dlBtn").onclick = () => { $("dlDlg").showModal(); $("dlUrl").focus(); };
+$("dlUrl").addEventListener("input", () => {
+  $("dlUrl").removeAttribute("aria-invalid");
+  if (!downloading && $("dlStatus").classList.contains("err")) {
+    downloadFailed = false;
+    showDownload("", null);
+    paintDownloadState();
+  }
+});
 $("dlGo").onclick = startDownload;
 $("dlUrl").onkeydown = e => { if (e.key === "Enter" && !downloading) startDownload(); };
 $("dlClose").onclick = () => $("dlDlg").close();
@@ -3131,6 +3258,7 @@ function setTab(which) {
   $("tabShort").setAttribute("aria-selected", which === "short");
   $("tabShorts").setAttribute("aria-selected", which === "shorts");
   if (which === "shorts") refreshShorts();
+  if (which === "details" && state.mode === "clip") renderSourceClipDetails();
 }
 $("tabClip").onclick = () => setTab("clip");
 $("tabShort").onclick = () => setTab("short");

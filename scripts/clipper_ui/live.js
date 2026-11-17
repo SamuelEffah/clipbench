@@ -65,11 +65,21 @@ function mount() {
   host.replaceChildren(Object.assign(document.createElement("div"), {id: "livePlayer"}));
 }
 
-function liveStatus(text, isError) {
+let liveConnecting = false, liveConnectingUrl = "";
+function paintLiveConnecting() {
+  liveEl("liveLoad").disabled = liveConnecting;
+  liveEl("liveLoad").textContent = liveConnecting ? "Connecting…" : "Connect stream";
+  liveEl("liveUrl").readOnly = liveConnecting;
+  liveEl("liveDialog").setAttribute("aria-busy", String(liveConnecting));
+}
+function liveStatus(text, isError, retryable = false) {
   const el = liveEl("liveHint");
   el.hidden = !text;
   el.textContent = text;
   el.classList.toggle("err", Boolean(isError));
+  liveEl("liveFeedback").hidden = !text;
+  liveEl("liveFeedback").dataset.state = isError ? "error" : liveConnecting ? "loading" : "info";
+  liveEl("liveRetry").hidden = !retryable;
 }
 
 // Browsers refuse sound before a click, so a start they block runs again muted, and the sound comes on at the next click or key.
@@ -88,10 +98,15 @@ function playMutedUntilTouched(mute, unmute) {
 // Loading another link, or leaving, while one is still loading drops it, so the player always shows the link that clips are cut from.
 let liveLoadToken = 0;
 async function openLive() {
-  const src = liveSource(liveEl("liveUrl").value);
+  const requestedUrl = liveEl("liveUrl").value.trim();
+  if (liveConnecting && requestedUrl === liveConnectingUrl) return;
+  const src = liveSource(requestedUrl);
   if (!src) return liveStatus("Paste a YouTube link, or a Twitch channel or video link", true);
   const token = ++liveLoadToken;
-  liveStatus("Loading the player");
+  liveConnecting = true;
+  liveConnectingUrl = requestedUrl;
+  paintLiveConnecting();
+  liveStatus(`Connecting to ${src.kind === "youtube" ? "YouTube" : "Twitch"}…`);
   try {
     destroyLive();
     mount();
@@ -103,7 +118,7 @@ async function openLive() {
         const p = new YT.Player("livePlayer", {videoId: src.id, width: "100%", height: "100%", playerVars: {playsinline: 1, rel: 0, autoplay: 1},
           events: {onReady: () => { clearTimeout(late); ok(p); p.playVideo(); }, onStateChange: e => e.data === 1 && onPlaying(),
             onAutoplayBlocked: () => playMutedUntilTouched(() => { p.mute(); p.playVideo(); }, () => p.unMute()),
-            onError: e => { clearTimeout(late); const msg = YT_ERRORS[e.data] || "This video can't play here"; fail(new Error(msg)); if (token === liveLoadToken) liveStatus(msg, true); }}});
+            onError: e => { clearTimeout(late); const msg = YT_ERRORS[e.data] || "This video can't play here"; fail(new Error(msg)); if (token === liveLoadToken) liveStatus(msg, true, true); }}});
       });
       if (token !== liveLoadToken) { try { player.destroy(); } catch {} return; }
       live.player = player;
@@ -111,21 +126,31 @@ async function openLive() {
       await loadScript("https://player.twitch.tv/js/embed/v1.js");
       if (token !== liveLoadToken) return;
       const twitch = new Twitch.Player("livePlayer", {[src.channel ? "channel" : "video"]: src.id, width: "100%", height: "100%", parent: [location.hostname], autoplay: true});
-      twitch.addEventListener(Twitch.Player.READY, () => twitch.play());
-      twitch.addEventListener(Twitch.Player.PLAYBACK_BLOCKED, () => playMutedUntilTouched(() => { twitch.setMuted(true); twitch.play(); }, () => twitch.setMuted(false)));
       live.player = twitch;
+      twitch.addEventListener(Twitch.Player.PLAYBACK_BLOCKED, () => playMutedUntilTouched(() => { twitch.setMuted(true); twitch.play(); }, () => twitch.setMuted(false)));
+      await new Promise((resolve, reject) => {
+        const late = setTimeout(() => reject(new Error("Twitch didn't load. Check the link and your connection")), PLAYER_TIMEOUT);
+        twitch.addEventListener(Twitch.Player.READY, () => { clearTimeout(late); twitch.play(); resolve(); });
+      });
+      if (token !== liveLoadToken) return;
     }
-    const url = liveEl("liveUrl").value.trim(), same = url === live.url, keep = same && !src.channel;
+    const url = requestedUrl, same = url === live.url, keep = same && !src.channel;
     Object.assign(live, {shift: src.channel ? 0 : null, isLive: Boolean(src.channel), buffer: 900, kind: src.kind, id: src.id, channel: Boolean(src.channel), recStart: 0, url, start: keep ? live.start : null, ranges: keep ? live.ranges : []});
-    if (src.channel) await startRecording(url, token);
+    const recorded = src.channel ? await startRecording(url, token) : true;
+    if (token !== liveLoadToken) return;
     liveEl("liveStage").hidden = false;
-    liveStatus("");
+    if (recorded) liveStatus("");
     liveEl("srcName").textContent = streamTitle() || "Stream";
     liveEl("srcMeta").textContent = src.kind === "twitch" ? "Twitch" : "YouTube";
     paintBuffer();
     renderLibrary();
   } catch (err) {
-    if (token === liveLoadToken) liveStatus(err.message, true);
+    if (token === liveLoadToken) liveStatus(err.message, true, true);
+  } finally {
+    if (token === liveLoadToken) {
+      liveConnecting = false;
+      paintLiveConnecting();
+    }
   }
 }
 
@@ -135,9 +160,12 @@ async function startRecording(url, token) {
   try {
     const got = await api("/api/live-record", "POST", {url});
     if (token === liveLoadToken) live.recStart = got.started;
+    if (token !== liveLoadToken) return false;
     liveStatus("");
+    return true;
   } catch (err) {
-    if (token === liveLoadToken) liveStatus(`Can't record this channel: ${err.message}`, true);
+    if (token === liveLoadToken) liveStatus(`Can't record this channel: ${err.message}`, true, true);
+    return false;
   }
 }
 const stopRecording = () => { if (live.channel) { live.recStart = 0; api("/api/live-record/stop", "POST", {}).catch(() => {}); } };
@@ -183,6 +211,7 @@ function onPlaying() {
   if (live.shift !== null || syncing || !playingLive()) return paintBuffer();
   live.isLive = true;
   syncToLive();
+  renderLibrary();
 }
 const liveNow = () => {
   if (live.channel) return Date.now() / 1000;
@@ -522,13 +551,15 @@ function enterLive() {
 // Leaving to edit a clip keeps the stream's link and your marks, so "Back to stream" picks up where you were. Closing drops them.
 function leaveLive(forGood = false) {
   liveLoadToken += 1;
+  liveConnecting = false;
+  paintLiveConnecting();
   clearInterval(live.ticker);
   live.resume = !forGood && live.url ? live.url : "";
   destroyLive();
   document.body.classList.remove("streaming");
   liveEl("liveBtn").setAttribute("aria-pressed", "false");
   liveEl("liveStage").replaceChildren();
-  for (const id of ["liveClip", "liveQuick", "liveTc", "liveJump", "liveStage", "liveHint", "liveBadge"]) liveEl(id).hidden = true;
+  for (const id of ["liveClip", "liveQuick", "liveTc", "liveJump", "liveStage", "liveHint", "liveFeedback", "liveRetry", "liveBadge"]) liveEl(id).hidden = true;
   previewEnd = null;
   liveEl("liveIn").classList.remove("pending");
   Object.assign(live, {isLive: false, shift: null});
@@ -549,6 +580,7 @@ function backToStream() {
 function showLiveDialog() {
   if (!liveEl("liveUrl").value && live.resume) liveEl("liveUrl").value = live.resume;
   liveEl("liveDialogStatus").hidden = true;
+  liveEl("liveUrl").removeAttribute("aria-invalid");
   liveEl("liveEnd").hidden = !streaming() && !live.resume;
   liveEl("liveDialog").showModal();
   liveEl("liveUrl").focus();
@@ -558,10 +590,12 @@ liveEl("liveBack").onclick = backToStream;
 liveEl("liveJump").onclick = jumpToLive;
 liveEl("liveBar").onsubmit = e => {
   e.preventDefault();
+  if (liveConnecting) return;
   if (!liveSource(liveEl("liveUrl").value)) {
     const status = liveEl("liveDialogStatus");
     status.textContent = "Paste a YouTube link, or a Twitch channel or video link";
     status.hidden = false;
+    liveEl("liveUrl").setAttribute("aria-invalid", "true");
     if (!liveEl("liveDialog").open) liveEl("liveDialog").showModal();
     liveEl("liveUrl").focus();
     return;
@@ -572,6 +606,14 @@ liveEl("liveBar").onsubmit = e => {
 };
 liveEl("liveClip").onclick = liveClip;
 liveEl("liveQuick").onclick = e => { const b = e.target.closest("button[data-secs]"); if (b) quick(Number(b.dataset.secs)); };
+liveEl("liveUrl").addEventListener("input", () => {
+  liveEl("liveUrl").removeAttribute("aria-invalid");
+  liveEl("liveDialogStatus").hidden = true;
+});
+liveEl("liveRetry").onclick = () => {
+  if (!streaming()) enterLive();
+  openLive();
+};
 liveEl("liveClose").onclick = () => liveEl("liveDialog").close();
 liveEl("liveEnd").onclick = () => {
   liveEl("liveUrl").value = "";

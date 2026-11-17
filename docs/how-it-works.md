@@ -72,7 +72,10 @@ being lost. Files outside the workspace are hashed by their full path.
    one decode gives the scene cuts and the picture motion (`video_scan.py`), the
    audio becomes a waveform, and the video is listened to once for a
    transcript if it has no English subtitles. A browser-friendly proxy is made
-   only if the original will not play directly.
+   only if the original will not play directly. Proxy conversions run one at a time
+   in a FIFO queue, so switching between incompatible sources does not launch
+   competing encoders. Failed jobs report an error and leave the worker free
+   to prepare the next video.
 
 3. **Find the moments.** `suggest.py` builds candidate windows that start and
    end on finished sentences or scene cuts, scores each from the opening

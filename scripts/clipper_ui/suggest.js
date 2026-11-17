@@ -14,6 +14,7 @@ const suggestAdded = s => Boolean(state.current) && suggestPieces(s).every(([a, 
 
 function suggestionKey(s) { return `${s.in}:${s.out}`; }
 let suggestionReview = new Map();
+let suggestionPreview = null;
 function addKeptSuggestions() {
   if (!state.current || suggestion.vid !== state.current.id) return;
   const clips = suggestion.clips.filter(s => suggestionReview.get(suggestionKey(s)) === "keep" && !suggestAdded(s)).flatMap(s => suggestClips(s));
@@ -26,6 +27,28 @@ function addKeptSuggestions() {
   toast(`${clips.length} clip${clips.length === 1 ? "" : "s"} added`);
 }
 
+// Review ranges are transient: they never become project clips until explicitly added.
+function paintSuggestionRange() {
+  const strip = $("strip");
+  strip.querySelectorAll(".suggestion-range").forEach(el => el.remove());
+  if (state.mode !== "clip" || !state.current || suggestion.vid !== state.current.id || $("suggest").hidden) return;
+  const moment = suggestion.clips.find(s => suggestionKey(s) === suggestionPreview);
+  if (!moment) return;
+  suggestPieces(moment).forEach(([a, b], i) => {
+    const start = Math.max(a, view.s), end = Math.min(b, view.e);
+    if (end <= start) return;
+    const range = document.createElement("div");
+    range.className = "suggestion-range";
+    range.setAttribute("role", "img");
+    range.setAttribute("aria-label", `Suggested range ${fmt(a)} to ${fmt(b)}`);
+    placeRange(range, {in: start, out: end});
+    const label = document.createElement("span");
+    label.textContent = moment.pieces ? `Preview · ${i + 1}` : "Preview";
+    range.append(label);
+    strip.append(range);
+  });
+}
+
 const PROFILE_NOTE = {speech: "Mostly talk, so wording counts most.", visual: "Mostly picture and few words, so motion and sound count most.", audio: "Little speech, so sound counts most.", mixed: "Talk and picture both, so both count."};
 const STEADY_NOTE = "Steady sound, like music, so loudness and the beat count most.";
 const profileNote = p => (p && p.steady ? STEADY_NOTE : PROFILE_NOTE[(p || {}).kind] || "");
@@ -36,6 +59,7 @@ const learnedNote = l => l && l.note ? `, <span class="learned" title="Moved ${l
 function paintSuggest() {
   const box = $("suggest"), here = state.current && suggestion.vid === state.current.id;
   box.hidden = !here || (!suggestion.clips.length && !suggestion.busy);
+  paintSuggestionRange();
   if (box.hidden) return;
   // The model scores one moment at a time, so while it works the list shows what it has scored so far, best first.
   const filling = suggestion.busy && suggestion.clips.length > 0;
@@ -46,27 +70,45 @@ function paintSuggest() {
     suggestion.busy ? "Finding complete moments across the transcript and checking scene boundaries." :
     `${spoken ? `Moments up to about a minute, with natural dialogue boundaries. ${suggestion.model ? `${esc(suggestion.model)} ranked a shortlist with surrounding dialogue for setup, payoff and clarity.` : "No local model is running, so there is no score for story. Start Ollama for a smarter pick."}` : "Stretches picked from the sound, the motion and the scene cuts, since little is said."} ${profileNote(suggestion.profile)} Best first.`;
   const rows = suggestion.clips.map((s, i) => {
-    const added = suggestAdded(s), decision = suggestionReview.get(suggestionKey(s));
-    return `<div class="sg" data-i="${i}" role="button" tabindex="0" title="Play this part"><div class="sgbody" style="opacity:${decision === "skip" ? ".4" : "1"}"><small class="num">${fmt(s.in)} to ${fmt(s.out)}, ${(s.length || s.out - s.in).toFixed(0)}s${s.pieces ? ", two moments joined" : ""}${s.why ? `, ${esc(s.why)}` : ""}${partsNote(s.parts)}${learnedNote(s.learned)}</small><p>${esc(s.text)}</p></div>` +
-      `<div class="sgactions"><button class="sgkeep" aria-pressed="${decision === "keep"}"${added ? " disabled" : ""}>${added ? "Added" : "Keep"}</button><button class="sgskip" aria-pressed="${decision === "skip"}"${added ? " disabled" : ""}>Skip</button></div></div>`;
+    const key = suggestionKey(s), added = suggestAdded(s), decision = suggestionReview.get(key);
+    const duration = suggestPieces(s).reduce((sum, [a, b]) => sum + b - a, 0);
+    const status = added ? "Added to clips" : decision === "keep" ? "Kept" : decision === "skip" ? "Skipped" : `Moment ${i + 1}`;
+    const reason = s.why || (s.text ? "Selected from the dialogue and scene boundaries." : "Selected from sound, motion and scene changes.");
+    return `<article class="sg sgcard" data-i="${i}" data-decision="${added ? "added" : decision || "pending"}" data-preview="${suggestionPreview === key}" aria-label="Suggested moment ${i + 1}">
+      <button class="sgpreview" type="button" aria-label="Preview moment ${i + 1}" aria-pressed="${suggestionPreview === key}"><span class="sgthumb"><img src="/video-thumb/${state.current.id}.jpg" alt="" loading="lazy"><svg class="i"><use href="#c-play"/></svg><span class="sgduration num">${duration.toFixed(0)}s</span></span><span class="sgmeta"><span class="sgstatus">${status}</span><span class="num">${fmt(s.in)} – ${fmt(s.out)}</span></span></button>
+      <p class="sgquote">${esc(s.text || "A visual moment. Preview to review the action.")}</p>
+      <p class="sgreason">${esc(reason)}${s.pieces ? " · Two moments joined" : ""}</p>
+      ${s.parts || s.learned ? `<details class="sgdetails"><summary>Ranking details</summary><div>${partsNote(s.parts).replace(/^, /, "")}${learnedNote(s.learned)}</div></details>` : ""}
+      <div class="sgactions"><button type="button" class="sgkeep" aria-label="Keep moment ${i + 1}" aria-pressed="${decision === "keep"}"${added ? " disabled" : ""}>${added ? "Added" : decision === "keep" ? "✓ Kept" : "Keep"}</button><button type="button" class="sgskip" aria-label="Skip moment ${i + 1}" aria-pressed="${decision === "skip"}"${added ? " disabled" : ""}>${decision === "skip" ? "Skipped" : "Skip"}</button></div></article>`;
   }).join("");
-  box.innerHTML = `<div class="sghead"><b>${head}</b><button class="ico" id="suggestClose" aria-label="Hide suggestions" title="Hide"><svg class="i"><use href="#close"/></svg></button></div><p class="sgbasis">${basis}</p><div class="sgreview"><span>Click a moment to preview</span><button id="suggestAddKept">Add kept</button></div><div class="sglist">${rows}</div>`;
+  box.innerHTML = `<div class="sghead"><b>${head}</b><button class="ico" id="suggestClose" aria-label="Back to saved clips" title="Back to saved clips">Saved clips (${state.project.clips.length})</button></div><details class="sgmethod"><summary>How moments are selected</summary><p class="sgbasis">${basis}</p></details><div class="sgreview"><span>Preview, then keep or skip</span><button id="suggestAddKept">Add kept</button></div><div class="sglist">${rows}</div>`;
   const note = box.querySelector(".sgbasis");
   note.title = note.textContent;
-  $("suggestClose").onclick = () => { suggestion = {...suggestion, vid: null, clips: []}; paintSuggest(); };
+  $("suggestClose").onclick = () => { suggestionPreview = null; suggestion = {...suggestion, vid: null, clips: []}; paintSuggest(); };
   const kept = suggestion.clips.filter(s => suggestionReview.get(suggestionKey(s)) === "keep" && !suggestAdded(s)).length;
   $("suggestAddKept").textContent = `Add kept${kept ? ` (${kept})` : ""}`;
   $("suggestAddKept").disabled = !kept;
   $("suggestAddKept").onclick = addKeptSuggestions;
   box.querySelectorAll(".sg").forEach(row => {
     const s = suggestion.clips[Number(row.dataset.i)];
-    row.onclick = () => playRange(suggestClips(s)[0]);
-    row.onkeydown = e => { if (e.key === "Enter" && e.target === row) playRange(suggestClips(s)[0]); };
+    row.querySelector(".sgpreview").onclick = () => {
+      suggestionPreview = suggestionKey(s);
+      box.querySelectorAll(".sgcard").forEach(card => {
+        const active = card === row;
+        card.dataset.preview = active;
+        card.querySelector(".sgpreview").setAttribute("aria-pressed", active);
+      });
+      paintSuggestionRange();
+      playRange(suggestClips(s)[0]);
+    };
     for (const decision of ["keep", "skip"]) row.querySelector(`.sg${decision}`).onclick = e => {
       e.stopPropagation();
       const key = suggestionKey(s), next = suggestionReview.get(key) === decision ? null : decision;
       suggestionReview.set(key, next);
+      const scroll = box.querySelector(".sglist").scrollTop;
       paintSuggest();
+      box.querySelector(".sglist").scrollTop = scroll;
+      box.querySelector(`.sg[data-i="${row.dataset.i}"] .sg${decision}`).focus({preventScroll: true});
       saveReview(state.current, s, next, suggestion.profile);
     };
   });
@@ -90,6 +132,7 @@ async function runSuggest() {
   if (!v) return toast("Pick a video first");
   if (suggestion.busy) return;
   suggestionReview = new Map();
+  suggestionPreview = null;
   suggestion = {vid: v.id, clips: [], model: "", busy: true, pct: 0};
   $("suggestBtn").disabled = true;
   paintSuggest();

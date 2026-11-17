@@ -38,6 +38,20 @@ class ProxyPreparationTests(unittest.TestCase):
             self.assertFalse((root / f'{vid}.part.mp4').exists())
         return commands
 
+    def test_interrupted_progress_reader_stops_encoder_before_releasing_worker(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            proc = mock.MagicMock(poll=mock.Mock(return_value=None))
+            proc.stdout.__iter__ = mock.Mock(side_effect=OSError('read failed'))
+            with mock.patch.object(clipper, 'PROXY_DIR', root), \
+                 mock.patch.object(clipper, 'probe', return_value={'duration': 2}), \
+                 mock.patch.object(clipper.subprocess, 'Popen', return_value=proc):
+                with self.assertRaises(OSError):
+                    clipper.run_proxy('interrupted-test', root / 'source.mkv')
+            proc.terminate.assert_called_once()
+            proc.wait.assert_called()
+            proc.stdout.close.assert_called_once()
+
     def test_compatible_mkv_copies_streams_without_encoding(self):
         commands = self.prepare()
         self.assertEqual(len(commands), 1)
@@ -73,6 +87,26 @@ class ProxyPreparationTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'FFmpeg required')
 class ProxyMediaTests(unittest.TestCase):
+    def test_real_incompatible_video_is_encoded_for_browser_playback(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / 'source.avi'
+            subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i',
+                            'testsrc2=size=160x90:rate=10', '-t', '0.5',
+                            '-c:v', 'mpeg4', str(source)], check=True, capture_output=True)
+            vid = 'b' * 12
+            self.addCleanup(clipper.proxies.pop, vid, None)
+            with mock.patch.object(clipper, 'PROXY_DIR', root):
+                clipper.run_proxy(vid, source)
+                self.assertEqual(clipper.proxy_status(vid)['state'], 'ready')
+                result = subprocess.run(['ffprobe', '-v', 'error', '-show_streams',
+                                         '-of', 'json', str(clipper.proxy_path(vid))],
+                                        capture_output=True, text=True, check=True)
+                stream = json.loads(result.stdout)['streams'][0]
+                self.assertEqual(stream['codec_name'], 'h264')
+                self.assertEqual(stream['height'], 540)
+                self.assertEqual(stream['pix_fmt'], 'yuv420p')
+
     def test_real_remux_preserves_video_frames_and_audio(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

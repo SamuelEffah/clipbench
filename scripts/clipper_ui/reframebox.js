@@ -50,7 +50,7 @@ const reframeUi = (() => {
   const dlg = document.createElement("dialog");
   dlg.id = "reframeDlg";
   dlg.innerHTML = '<header class="rdhead"><h3 id="rfTitle">Reframe</h3><button type="button" class="rdx" id="rfX" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12"/></svg></button></header>' +
-    '<div class="rf-tools" role="toolbar" aria-label="Crop tools"><button type="button" data-rftool="move" aria-pressed="true">Move</button><button type="button" data-rftool="draw" aria-pressed="false">Draw crop</button><button type="button" data-rftool="subject" aria-pressed="false" title="Click the subject to centre the crop on it">Select subject</button><span id="rfRatio" title="Crop shape is locked to the target lane"></span></div><div id="rfFrame"><div id="rfStage"><video id="rfVideo" muted playsinline preload="auto"></video><div id="rfBox" hidden>' + ["nw", "ne", "sw", "se"].map(h => `<i class="fh ${h}" data-h="${h}"></i>`).join("") + '</div></div></div>' +
+    '<div id="rfFrame"><div id="rfStage"><video id="rfVideo" muted playsinline preload="auto"></video><div id="rfBox" hidden>' + ["nw", "ne", "sw", "se"].map(h => `<i class="fh ${h}" data-h="${h}"></i>`).join("") + '</div></div></div>' +
     '<div class="rfscrub"><input type="range" id="rfScrub" min="0" max="1" step="0.001" value="0" aria-label="Frame of the clip"><span class="num" id="rfTime"></span>' +
     '<span class="rfzoom"><button type="button" id="rfZoomOut" aria-label="Zoom out">&minus;</button><button type="button" id="rfZoomPct" aria-label="Fit the whole frame" title="Fit the whole frame">100%</button><button type="button" id="rfZoomIn" aria-label="Zoom in">+</button></span></div><p class="hint" id="rfHint"></p>' +
     '<div class="btnrow rffoot"><button type="button" id="rfFace">Find face</button><span class="grow"></span><button type="button" id="rfStop" hidden>Stop tracking</button><button type="button" id="rfReset">Reset</button><button type="button" id="rfApply" class="rfapply">Apply</button></div>';
@@ -100,10 +100,10 @@ function openReframe(i, mode = "frame") {
   if (!v) return toast("This clip's video is not loaded");
   const vid = document.getElementById("rfVideo");
   const follow = mode === "track";
-  rf = {i, mode, tool: "move", cell: cellOf(clip), size: null, box: null, gesture: null, start: clip, view: {z: 1, x: 0, y: 0}, space: false, at: follow ? clip.in : clip.in + (clip.out - clip.in) / 2};
+  rf = {i, mode, cell: cellOf(clip), size: null, box: null, gesture: null, start: clip, view: {z: 1, x: 0, y: 0}, space: false, at: follow ? clip.in : clip.in + (clip.out - clip.in) / 2};
   document.getElementById("rfTitle").textContent = `${follow ? "Tracking" : "Reframe"} clip ${i + 1}`;
-  setReframeTool("move");
-  document.getElementById("rfRatio").textContent = "Ratio locked";
+  document.getElementById("rfHint").textContent = "Drag inside to move · Corners to resize · Drag outside to redraw";
+  document.getElementById("rfHint").title = "Click outside the crop to center it there. The crop ratio stays locked. Pinch or Ctrl-scroll to magnify; hold Space and drag to pan.";
   document.getElementById("rfApply").textContent = follow ? "Track" : "Apply";
   document.getElementById("rfStop").hidden = !(follow && trackingOn(clip));
   const ready = () => {
@@ -148,18 +148,13 @@ function startBox(e) {
   e.preventDefault();
   if (e.button === 1 || rf.space) {
     rf.gesture = {kind: "pan", cx: e.clientX, cy: e.clientY, x: rf.view.x, y: rf.view.y};
-  } else if (rf.tool === "subject" && b) {
-    rf.box = {...b, x: Math.max(0, Math.min(1 - b.w, px - b.w / 2)), y: Math.max(0, Math.min(1 - b.h, py - b.h / 2))};
-    paintBox();
-    setReframeTool("move");
-    return;
   } else if (handle && b) {
     const h = handle.dataset.h, ax = h.includes("w") ? b.x + b.w : b.x, ay = h.includes("n") ? b.y + b.h : b.y;
     rf.gesture = {kind: "grow", ax, ay, shape, max: fw};
-  } else if (b && rf.tool !== "draw") {
+  } else if (b && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) {
     rf.gesture = {kind: "move", dx: px - b.x, dy: py - b.y};
   } else {
-    rf.gesture = {kind: "grow", ax: px, ay: py, shape, max: fw};
+    rf.gesture = {kind: "draw", ax: px, ay: py, cx: e.clientX, cy: e.clientY, moved: false, original: b, shape, max: fw};
   }
   document.getElementById("rfStage").setPointerCapture(e.pointerId);
 }
@@ -172,6 +167,10 @@ function moveBox(e) {
     return paintView();
   }
   const [px, py] = pointOn(e);
+  if (g.kind === "draw") {
+    if (!g.moved && Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < 4) return;
+    g.moved = true;
+  }
   if (g.kind === "move") {
     const b = rf.box;
     rf.box = {...b, x: Math.min(1 - b.w, Math.max(0, px - g.dx)), y: Math.min(1 - b.h, Math.max(0, py - g.dy))};
@@ -240,20 +239,23 @@ async function findFaceBox() {
   }
 }
 
-function setReframeTool(tool) {
-  if (!rf) return;
-  rf.tool = tool;
-  document.querySelectorAll("[data-rftool]").forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.rftool === tool)));
-  document.getElementById("rfStage").dataset.tool = tool;
-  document.getElementById("rfHint").textContent = tool === "subject" ? "Click the subject to centre the crop." : tool === "draw" ? "Draw a new crop. Shape stays locked to the lane." : "Drag to move · Corners to resize";
-  document.getElementById("rfHint").title = "Pinch or Ctrl-scroll to magnify the source. Hold Space and drag to move the magnified view.";
+function finishBox(e) {
+  if (!rf || !rf.gesture) return;
+  const g = rf.gesture;
+  if (e.type === "pointercancel") {
+    if (g.kind === "draw") { rf.box = g.original; paintBox(); }
+  } else if (g.kind === "draw" && !g.moved && g.original) {
+    const b = g.original;
+    rf.box = {...b, x: Math.max(0, Math.min(1 - b.w, g.ax - b.w / 2)), y: Math.max(0, Math.min(1 - b.h, g.ay - b.h / 2))};
+    paintBox();
+  }
+  rf.gesture = null;
 }
-document.querySelectorAll("[data-rftool]").forEach(btn => btn.onclick = () => setReframeTool(btn.dataset.rftool));
 const rfStage = document.getElementById("rfStage");
 rfStage.addEventListener("pointerdown", startBox);
 rfStage.addEventListener("pointermove", moveBox);
-rfStage.addEventListener("pointerup", () => { if (rf) rf.gesture = null; });
-rfStage.addEventListener("pointercancel", () => { if (rf) rf.gesture = null; });
+rfStage.addEventListener("pointerup", finishBox);
+rfStage.addEventListener("pointercancel", finishBox);
 rfStage.parentElement.addEventListener("wheel", e => {
   if (!rf || !rf.size) return;
   e.preventDefault();

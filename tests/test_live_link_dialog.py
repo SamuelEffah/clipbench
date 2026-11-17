@@ -14,12 +14,13 @@ class LiveLinkDialog(unittest.TestCase):
         harness = r'''
 const assert=require('assert'),vm=require('vm');
 const nodes=new Map();let running=false,loaded=0,entered=0,left=0;
-const liveEl=id=>{if(!nodes.has(id))nodes.set(id,{value:'',hidden:false,open:false,focus(){},showModal(){this.open=true;},close(){this.open=false;}});return nodes.get(id);};
-const context={liveEl,live:{resume:''},streaming:()=>running,liveSource:value=>value.startsWith('https://www.youtube.com/watch?v=')?{}:null,enterLive(){entered++;running=true;},openLive(){loaded++;},leaveLive(permanent){assert(permanent);left++;running=false;},backToStream(){},jumpToLive(){},liveClip(){},quick(){}};
+const liveEl=id=>{if(!nodes.has(id))nodes.set(id,{value:'',hidden:false,open:false,attrs:{},listeners:{},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},addEventListener(k,fn){this.listeners[k]=fn;},focus(){},showModal(){this.open=true;},close(){this.open=false;}});return nodes.get(id);};
+const context={liveConnecting:false,liveEl,live:{resume:''},streaming:()=>running,liveSource:value=>value.startsWith('https://www.youtube.com/watch?v=')?{}:null,enterLive(){entered++;running=true;},openLive(){loaded++;},leaveLive(permanent){assert(permanent);left++;running=false;},backToStream(){},jumpToLive(){},liveClip(){},quick(){}};
 vm.runInNewContext(SOURCE,context);
 liveEl('liveBtn').onclick();assert(liveEl('liveDialog').open);assert(liveEl('liveEnd').hidden);assert.equal(entered,0);
 liveEl('liveClose').onclick();assert(!liveEl('liveDialog').open);assert.equal(left,0);
-liveEl('liveBar').onsubmit({preventDefault(){}});assert(liveEl('liveDialog').open);assert(!liveEl('liveDialogStatus').hidden);assert.equal(loaded,0);
+liveEl('liveBar').onsubmit({preventDefault(){}});assert(liveEl('liveDialog').open);assert(!liveEl('liveDialogStatus').hidden);assert.equal(loaded,0);assert.equal(liveEl('liveUrl').attrs['aria-invalid'],'true');
+liveEl('liveUrl').listeners.input();assert(liveEl('liveDialogStatus').hidden);assert.equal(liveEl('liveUrl').attrs['aria-invalid'],undefined);
 liveEl('liveUrl').value='https://www.youtube.com/watch?v=example';liveEl('liveBar').onsubmit({preventDefault(){}});assert(!liveEl('liveDialog').open);assert.equal(entered,1);assert.equal(loaded,1);
 liveEl('liveBtn').onclick();assert(!liveEl('liveEnd').hidden);assert.equal(left,0);liveEl('liveClose').onclick();assert.equal(left,0);assert(running);
 liveEl('liveBtn').onclick();liveEl('liveEnd').onclick();assert.equal(left,1);assert.equal(liveEl('liveUrl').value,'');assert(!liveEl('liveDialog').open);

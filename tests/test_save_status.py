@@ -27,32 +27,44 @@ class SavePill(unittest.TestCase):
         self.run_js(r'''
 assert.equal(paintSaveState(el, "offline", retry), "offline");
 assert.equal(el.textContent, "Offline");
-assert.equal(el.className, "saved bad");
+assert.equal(el.className, "saved save-status bad");
 assert.equal(el.onclick, retry);
 assert.ok(el.title.includes("Click to try now"));
 paintSaveState(el, "failed", retry);
 assert.equal(el.textContent, "Not saved");
-assert.equal(el.className, "saved bad");
+assert.equal(el.className, "saved save-status bad");
 ''')
 
     def test_a_save_after_trouble_says_so_in_green_for_a_moment_then_hides(self):
         self.run_js(r'''
 paintSaveState(el, "offline", retry);
-assert.equal(paintSaveState(el, "saved"), "back");
+assert.equal(paintSaveState(el, "saved"), "saved");
 assert.equal(el.textContent, "Saved");
-assert.equal(el.className, "saved good");
+assert.equal(el.className, "saved save-status");
 assert.equal(el.onclick, null);
 assert.equal(timers.length, 1); assert.equal(timers[0][1], BACK_FOR);
 timers[0][0]();
-assert.equal(el.className, "saved");
+assert.equal(el.className, "saved save-status");
+''')
+
+    def test_saving_clears_retry_and_disables_the_status(self):
+        self.run_js(r'''
+paintSaveState(el, "failed", retry);
+paintSaveState(el, "saving");
+assert.equal(el.textContent, "Saving…");
+assert.equal(el.className, "saved save-status saving");
+assert.equal(el.disabled, true);
+assert.equal(el.onclick, null);
 ''')
 
     def test_a_plain_save_stays_quiet(self):
         self.run_js(r'''
 assert.equal(paintSaveState(el, "saved"), "saved");
 assert.equal(el.textContent, "Saved");
-assert.equal(el.className, "saved");
-assert.equal(timers.length, 0);
+assert.equal(el.className, "saved save-status");
+assert.equal(timers.length, 1);
+timers[0][0]();
+assert.equal(el.hidden, true);
 ''')
 
 

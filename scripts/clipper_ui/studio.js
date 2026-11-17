@@ -38,10 +38,65 @@
     el('new-project').disabled = !active;
     el('connections-toggle').disabled = !active;
   }
+  let projectList = [];
+  const PROJECT_SORT = 'clipbench.projectSort';
+  const savedSort = read(PROJECT_SORT);
+  if (['recent', 'name-asc', 'name-desc', 'clips'].includes(savedSort)) el('project-sort').value = savedSort;
+  function sortProjects(projects, sort) {
+    const name = (a, b) => a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'});
+    return [...projects].sort((a, b) => {
+      if (sort === 'name-asc') return name(a, b);
+      if (sort === 'name-desc') return name(b, a);
+      if (sort === 'clips') return (Number(b.clips) || 0) - (Number(a.clips) || 0) || name(a, b);
+      return (Number(b.updated_at) || 0) - (Number(a.updated_at) || 0) || name(a, b);
+    });
+  }
+  const sortLabels = {recent:'Last edited', 'name-asc':'Name A–Z', 'name-desc':'Name Z–A', clips:'Most clips'};
+  const sortItems = () => [...el('project-sort-menu').querySelectorAll('[data-project-sort]')];
+  function paintProjectSort() {
+    const value = el('project-sort').value;
+    el('project-sort-label').textContent = sortLabels[value] || sortLabels.recent;
+    el('project-sort').setAttribute('aria-label', 'Sort projects: ' + (sortLabels[value] || sortLabels.recent));
+    sortItems().forEach(button => button.setAttribute('aria-checked', String(button.dataset.projectSort === value)));
+  }
+  function showProjectSort(open, focus = false) {
+    el('project-sort-menu').hidden = !open;
+    el('project-sort').setAttribute('aria-expanded', String(open));
+    if (open && focus) (sortItems().find(button => button.getAttribute('aria-checked') === 'true') || sortItems()[0]).focus();
+  }
+  el('project-sort').onclick = () => showProjectSort(el('project-sort-menu').hidden, true);
+  el('project-sort').onkeydown = event => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); showProjectSort(true, true); }
+  };
+  sortItems().forEach(button => { button.onclick = () => {
+    el('project-sort').value = button.dataset.projectSort;
+    el('project-sort').onchange();
+    showProjectSort(false);
+    el('project-sort').focus();
+  }; });
+  el('project-sort-menu').onkeydown = event => {
+    const buttons = sortItems(), at = buttons.indexOf(document.activeElement);
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); showProjectSort(false); el('project-sort').focus(); }
+    else if (event.key === 'Tab') showProjectSort(false);
+    else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (at + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+      buttons[next].focus();
+    }
+  };
+  document.addEventListener('click', event => { if (!event.target.closest('.project-sort-control')) showProjectSort(false); });
+  paintProjectSort();
+  el('project-sort').onchange = () => {
+    remember(PROJECT_SORT, el('project-sort').value);
+    paintProjectSort();
+    closeProjectMenus();
+    paintProjects(projectList);
+  };
   function paintProjects(projects) {
-    el('project-count').textContent = projects.length;
+    projectList = projects;
+    el('project-sort').disabled = !projects.length;
     el('empty-projects').hidden = projects.length > 0;
-    el('home-recent').replaceChildren(...projects.map(project => {
+    el('home-recent').replaceChildren(...sortProjects(projects, el('project-sort').value).map(project => {
       const card = node('article','home-row');
       const link = node('a','project-open'); link.href = '/editor?project=' + encodeURIComponent(project.name);
       link.onclick = () => remember('clipbench.lastProject', project.name);
@@ -63,7 +118,7 @@
         cover.replaceChildren();
         const add = node('a','project-add-videos'); add.href = link.href + '&add=1';
         add.setAttribute('aria-label',`Add videos to ${project.name}`);
-        add.append(node('span','add-videos-icon','+'),node('strong','','Add videos'),node('small','','Start your first clip'));
+        add.append(node('strong','','Add videos'),node('small','','Start your first clip'));
         add.onclick = () => remember('clipbench.lastProject',project.name);
         cover.append(add);
       } else cover.append(node('span','cover-open','Open project ↗'));
@@ -119,7 +174,8 @@
     connectionNote(''); el('connections-panel').hidden = true;
     el('connections-toggle').setAttribute('aria-expanded','false');
     status('Loading projects…'); el('retry-load').hidden = true;
-    el('empty-projects').hidden = true; el('home-recent').replaceChildren(); el('project-count').textContent = '';
+    el('empty-projects').hidden = true; el('home-recent').replaceChildren();
+    projectList = []; el('project-sort').disabled = true; showProjectSort(false);
     paintProfiles(); paintAccount();
     await Promise.all([
       api('/api/home-recent?all=1&profile=' + encodeURIComponent(id)).then(projects => { if (token === generation) { active.projects = projects.length; paintProjects(projects); status(''); } }).catch(error => { if (token === generation) { status(error.message); el('retry-load').hidden = false; } }),

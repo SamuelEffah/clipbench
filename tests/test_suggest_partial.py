@@ -69,18 +69,29 @@ const $ = id => id === "suggest" ? box : {textContent: "", disabled: false, oncl
 const esc = s => String(s), fmt = t => String(t);
 const suggestAdded = () => false, suggestClips = s => [s], playRange = () => {}, saveReview = () => {}, addKeptSuggestions = () => {};
 const suggestionKey = s => `${s.in}:${s.out}`;
+const suggestPieces = s => s.pieces || [[s.in, s.out]];
+const paintSuggestionRange = () => {};
+let suggestionPreview = null;
 let suggestionReview = new Map();
 let suggestion = {vid: "v", busy: true, pct: 40, model: "qwen3", profile: {kind: "speech"}, clips: [
   {in: 1, out: 31, score: 0.7, text: "a", why: "joke"}, {in: 40, out: 70, score: 0.6, text: "b"}, {in: 80, out: 110, score: 0.5, text: "c"}]};
 ''' + paint + r'''
 paintSuggest();
 assert.equal(box.hidden, false);
-assert.equal((box.innerHTML.match(/class="sg"/g) || []).length, 3, "every moment scored so far is listed");
+assert.equal((box.innerHTML.match(/class="sg sgcard"/g) || []).length, 3, "every moment scored so far is listed");
 assert.match(box.innerHTML, /3 so far, 40% scored/);
+assert.match(box.innerHTML, /aria-label="Preview moment 1"/);
+assert.match(box.innerHTML, /aria-label="Keep moment 1"/);
+assert.match(box.innerHTML, /aria-label="Skip moment 1"/);
+assert.match(box.innerHTML, /class="sgreason">joke/);
+suggestion = {...suggestion, clips: [{in: 1, out: 50, pieces: [[1, 11], [40, 50]], text: "joined"}]};
+paintSuggest();
+assert.match(box.innerHTML, /sgduration num">20s/);
+assert.match(box.innerHTML, /Two moments joined/);
 suggestion = {...suggestion, clips: []};
 paintSuggest();
 assert.match(box.innerHTML, /Looking for clips, 40%/);
-assert.equal((box.innerHTML.match(/class="sg"/g) || []).length, 0);
+assert.equal((box.innerHTML.match(/class="sg sgcard"/g) || []).length, 0);
 '''
         out = subprocess.run(["node", "-e", script], capture_output=True, text=True)
         self.assertEqual(out.returncode, 0, out.stderr)

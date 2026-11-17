@@ -92,3 +92,49 @@ sideEl.addEventListener("drop", e => {
 });
 // A file dropped outside the panel would make the browser navigate away from the editor.
 for (const type of ["dragover", "drop"]) window.addEventListener(type, e => { if (hasFiles(e)) e.preventDefault(); });
+
+// Reconnect project clips to a local copy of their original source, with undo support.
+let locatingSource = null;
+function locateSource(source) {
+  if (dropZone.busy) return toast("Wait for the current upload to finish");
+  locatingSource = {source, project: state.project.name};
+  $("sourceLocatePick").value = "";
+  $("sourceLocatePick").click();
+}
+
+function reconnectedClips(clips, path, replacement) {
+  return clips.map(c => c.src === path ? {...c, src: replacement} : c);
+}
+
+$("sourceLocatePick").onchange = async e => {
+  const file = e.target.files[0], pending = locatingSource;
+  e.target.value = "";
+  locatingSource = null;
+  if (!file || !pending) return;
+  if (state.project.name !== pending.project) return toast("Return to the original project to locate its source");
+  if (!isVideoFile(file)) return toast("Choose the original video file");
+  if (dropZone.busy) return toast("Wait for the current upload to finish");
+  dropZone.busy = true;
+  try {
+    showUpload(`Reconnecting ${pending.source.name}`, 0);
+    const out = await uploadVideo(file, pct => showUpload(`Reconnecting ${pending.source.name}, ${pct}%`, pct));
+    if (state.project.name !== pending.project) return toast("Video imported. Return to the original project to reconnect its clips");
+    await refreshLibrary();
+    if (state.project.name !== pending.project) return;
+    const replacement = state.library.find(v => v.path === out.path);
+    if (!replacement) throw new Error("The video could not be read. Your clips are unchanged");
+    if (replacement.duration + 0.1 < pending.source.end) throw new Error("This video is shorter than the saved clips. Choose the original full-length source");
+    state.project = {...state.project,
+      clips: reconnectedClips(state.project.clips, pending.source.path, out.path),
+      other: reconnectedClips(state.project.other || [], pending.source.path, out.path)};
+    changed();
+    for (const c of [...state.project.clips, ...state.project.other]) if (c.src === out.path) requestCut(c);
+    await openVideo(replacement);
+    toast("Source reconnected. Clip timing and edits preserved");
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    dropZone.busy = false;
+    showUpload(null);
+  }
+};

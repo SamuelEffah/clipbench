@@ -10,7 +10,7 @@
 <body class="has-project">
 <a class="home-brand" href="/" aria-label="Clipbench home"><img src="/assets/planet-logo.svg" alt="" width="24" height="24"><span>Clipbench</span></a>
 <div class="profile-control">
-<div class="menu-label"><span>Profiles</span><div class="profile-tools"><button id="add-profile" aria-label="Create profile">+</button></div></div>
+<div class="menu-label"><span>Profiles</span><div class="profile-tools"><button id="add-profile" aria-label="Create profile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
 <div id="profile-options" aria-label="Profiles"></div><button id="profile-settings" hidden class="profile-settings-link" title="Settings for the selected profile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 4 .6-2h3.8l.6 2 1.8 1 2-.5 1.9 3.3-1.4 1.5v2.1l1.4 1.5-1.9 3.3-2-.5-1.8 1-.6 2h-3.8l-.6-2-1.8-1-2 .5-1.9-3.3 1.4-1.5V9.3L3.9 7.8l1.9-3.3 2 .5Z" transform="translate(0 2)"/><circle cx="12" cy="12" r="3"/></svg><span>Profile settings</span></button>
 </div>
 <main class="home" aria-label="Clipbench">
@@ -22,7 +22,14 @@
 <p id="connection-note" role="status" aria-live="polite"></p><a id="signin-link" target="_blank" rel="noopener noreferrer" hidden>Open Google sign-in</a><button id="cancel-signin" class="connection-secondary" hidden>Cancel sign-in</button><button id="disconnect-channel" class="connection-secondary" hidden>Disconnect YouTube</button>
 </section><div class="home-content">
 
-<section id="home-project" aria-labelledby="resume-title"><div class="project-heading"><div><h1 id="resume-title">Your projects</h1><p class="heading-description">A space for every story you want to tell.</p></div><button class="new-primary" id="new-project"><span aria-hidden="true">+</span> New project</button></div><div class="home-lbl"><span>Recent projects <span id="project-count"></span></span><span class="sort-label">Last edited ↓</span></div><div id="home-recent"></div><div id="empty-projects" hidden><p>No projects yet</p><span>Start your first project in this profile.</span></div></section>
+<section id="home-project" aria-labelledby="resume-title"><div class="project-heading"><div><h1 id="resume-title">Your projects</h1><p class="heading-description">A space for every story you want to tell.</p></div><div class="project-heading-actions"><div class="project-sort-control">
+<button type="button" id="project-sort" value="recent" aria-label="Sort projects: Last edited" aria-haspopup="menu" aria-expanded="false" aria-controls="project-sort-menu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h4"/></svg><span id="project-sort-label">Last edited</span><svg class="sort-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
+<div id="project-sort-menu" class="project-sort-menu" role="menu" aria-label="Sort projects" hidden><span class="sort-menu-heading">Sort by</span>
+<button type="button" role="menuitemradio" aria-checked="true" data-project-sort="recent" tabindex="-1">Last edited<span class="sort-check" aria-hidden="true">✓</span></button>
+<button type="button" role="menuitemradio" aria-checked="false" data-project-sort="name-asc" tabindex="-1">Name A–Z<span class="sort-check" aria-hidden="true">✓</span></button>
+<button type="button" role="menuitemradio" aria-checked="false" data-project-sort="name-desc" tabindex="-1">Name Z–A<span class="sort-check" aria-hidden="true">✓</span></button>
+<button type="button" role="menuitemradio" aria-checked="false" data-project-sort="clips" tabindex="-1">Most clips<span class="sort-check" aria-hidden="true">✓</span></button>
+</div></div><button class="new-primary" id="new-project"><span aria-hidden="true">+</span> New project</button></div></div><div id="home-recent"></div><div id="empty-projects" hidden><p>No projects yet</p><span>Start your first project in this profile.</span></div></section>
 
 <p id="studio-status" role="status" aria-live="polite"></p><button id="retry-load" class="secondary" hidden>Try again</button>
 </div></section>

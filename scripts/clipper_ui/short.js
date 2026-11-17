@@ -854,6 +854,53 @@ function section(title, rows, note = "") {
   return box;
 }
 
+// The source clip inspector edits the bank clip directly, using the same fields as the Short.
+function openSourceClipDetails(i) {
+  if (!state.project.clips[i] || inShort()) return;
+  suggestionPreview = null;
+  video.pause();
+  state.clipStop = null;
+  resetPlayback();
+  select(i);
+  const clip = state.project.clips[i];
+  if (state.current?.path === clip.src) video.currentTime = clip.in;
+  setTab("details");
+  $("sourceDetailsBack").focus();
+}
+
+function renderSourceClipDetails() {
+  const panel = $("panelDetails"), i = state.sel, c = state.project.clips[i];
+  const back = document.createElement("button");
+  back.id = "sourceDetailsBack";
+  back.className = "source-details-back";
+  back.textContent = "← Saved clips";
+  back.onclick = () => {
+    setTab("clip");
+    $("tray").querySelector(`[aria-label="Edit clip ${state.sel + 1}"]`)?.focus();
+  };
+  if (!c) {
+    const empty = document.createElement("p");
+    empty.className = "hint";
+    empty.textContent = "Select a saved clip to edit its caption, speed and sound.";
+    panel.replaceChildren(back, empty);
+    return;
+  }
+  const source = byPath(c.src);
+  const head = document.createElement("div");
+  head.className = "source-clip-heading";
+  head.innerHTML = `<span class="inspector-eyebrow">Selected clip ${i + 1}</span><h2>${esc(source?.name || "Missing source video")}</h2><p class="num">${fmt(c.in)} – ${fmt(c.out)}<span>${outLen(c).toFixed(1)}s</span></p>`;
+  const play = document.createElement("button");
+  play.className = "source-clip-play";
+  play.textContent = "Preview clip";
+  play.disabled = !source;
+  play.onclick = () => playRange(state.project.clips[state.sel]);
+  const volume = volumeField(i);
+  volume.querySelector("input").addEventListener("change", () => render());
+  panel.replaceChildren(back, head, play,
+    section("Caption", [captionField(i)]),
+    section("Playback", [speedField(i), volume]));
+}
+
 function renderDetails() {
   const panel = $("panelDetails");
   const sound = inShort() && state.audioSel ? audioOf().find(a => a.id === state.audioSel) : null;
@@ -1101,8 +1148,23 @@ function setMode(mode) {
   }
 }
 
+function paintShortWelcome() {
+  const empty = inShort() && !state.project.clips.length;
+  const bank = inShort() ? bankOf().length : 0;
+  $("shortWelcome").hidden = true;
+  $("theater").classList.toggle("short-empty", empty);
+  $("shortWelcomeNote").textContent = bank
+    ? `${bank} saved clip${bank === 1 ? " is" : "s are"} ready. Choose the moments you want in this Short.`
+    : "Find a moment in your source video, then bring it here to build your Short.";
+  $("shortWelcomeChoose").hidden = !bank;
+  $("shortWelcomeFind").textContent = bank ? "Find more moments ↗" : "Find clips ↗";
+  $("shortWelcomeFind").classList.toggle("primary", !bank);
+  if (inShort()) for (const id of ["thPlay", "thPrev", "thNext"]) $(id).disabled = empty;
+}
+
 function renderShortMode() {
   const short = inShort();
+  paintShortWelcome();
   document.body.dataset.mode = state.mode;
   $("modeClip").setAttribute("aria-selected", !short);
   $("modeShort").setAttribute("aria-selected", short);
@@ -1115,13 +1177,24 @@ function renderShortMode() {
   $("tabAudio").hidden = !short;
   $("tabShort").hidden = !short;
   if (!short) {
-    if (currentTab === "details" || currentTab === "short") setTab("clip");
+    if (currentTab === "short") setTab("clip");
+    if (currentTab === "details") renderSourceClipDetails();
     return;
   }
   renderShortTl();
   if (preview.on) { buildSegs(); fitPhone(); }
 }
 
+$("shortWelcomeChoose").onclick = () => {
+  railShow("clips");
+  $("bankRows").querySelector("button")?.focus();
+};
+$("shortWelcomeFind").onclick = async () => {
+  const source = state.current || byPath(bankOf()[0]?.src) || sourcesOf()[0];
+  setMode("clip");
+  if (source && state.current?.id !== source.id) await openVideo(source);
+  $(source ? "suggestBtn" : "addBtn").focus();
+};
 $("modeClip").onclick = () => setMode("clip");
 $("modeShort").onclick = () => setMode("short");
 $("tabDetails").onclick = () => setTab("details");
